@@ -8,10 +8,10 @@ export const ALERT_TYPE_OPTIONS = ['green', 'warning', 'urgent']
 
 /** 四个立方体 / 标注共用的世界坐标（y 为建筑顶面高度） */
 const DEMO_LAYOUT = [
-  { code: 'X01', x: -2.4, y: 1.0, z: -1.2, h: 1.0, color: 0x9ca3af },
-  { code: 'X06', x: 2.4, y: 1.1, z: -1.0, h: 1.1, color: 0x8b919a },
-  { code: 'X12', x: -2.2, y: 0.9, z: 1.6, h: 0.9, color: 0xa1a8b3 },
-  { code: 'X09', x: 2.2, y: 1.05, z: 1.8, h: 1.05, color: 0x949aa5 },
+  { name: 'X01', x: -2.4, y: 1.0, z: -1.2, h: 1.0, color: 0x9ca3af },
+  { name: 'X06', x: 2.4, y: 1.1, z: -1.0, h: 1.1, color: 0x8b919a },
+  { name: 'X12', x: -2.2, y: 0.9, z: 1.6, h: 0.9, color: 0xa1a8b3 },
+  { name: 'X09', x: 2.2, y: 1.05, z: 1.8, h: 1.05, color: 0x949aa5 },
 ]
 
 /** 供场景创建 4 个立方体 */
@@ -26,18 +26,18 @@ export const DEMO_BUILDINGS = DEMO_LAYOUT.map((item) => ({
 
 /** 图一 Demo：仅厂房名，背景随告警类型变 —— 4 个标注 */
 export const DEMO1_MARKER_SEED = [
-  { id: 'd1-m1', alertType: 'green', code: 'X01', labelMode: 'name', position: [-2.4, 1.0, -1.2] },
-  { id: 'd1-m2', alertType: 'warning', code: 'X06', labelMode: 'name', position: [2.4, 1.1, -1.0] },
-  { id: 'd1-m3', alertType: 'urgent', code: 'X12', labelMode: 'name', position: [-2.2, 0.9, 1.6] },
-  { id: 'd1-m4', alertType: 'green', code: 'X09', labelMode: 'name', position: [2.2, 1.05, 1.8] },
+  { type: 'green', name: 'X01', position: [-2.4, 1.0, -1.2] },
+  { type: 'warning', name: 'X06', position: [2.4, 1.1, -1.0] },
+  { type: 'urgent', name: 'X12', position: [-2.2, 0.9, 1.6] },
+  { type: 'green', name: 'X09', position: [2.2, 1.05, 1.8] },
 ]
 
 /** 图二 Demo：厂房名 + 动态数量 —— 4 个标注 */
 export const DEMO2_MARKER_SEED = [
-  { id: 'd2-m1', alertType: 'urgent', code: 'X01', count: 1, labelMode: 'nameCount', position: [-2.4, 1.0, -1.2] },
-  { id: 'd2-m2', alertType: 'warning', code: 'X06', count: 2, labelMode: 'nameCount', position: [2.4, 1.1, -1.0] },
-  { id: 'd2-m3', alertType: 'green', code: 'X12', count: 8, labelMode: 'nameCount', position: [-2.2, 0.9, 1.6] },
-  { id: 'd2-m4', alertType: 'warning', code: 'X09', count: 15, labelMode: 'nameCount', position: [2.2, 1.05, 1.8] },
+  { type: 'urgent', name: 'X01', count: 1, position: [-2.4, 1.0, -1.2] },
+  { type: 'warning', name: 'X06', count: 2, position: [2.4, 1.1, -1.0] },
+  { type: 'green', name: 'X12', count: 8, position: [-2.2, 0.9, 1.6] },
+  { type: 'warning', name: 'X09', count: 15, position: [2.2, 1.05, 1.8] },
 ]
 
 /** @deprecated 兼容旧引用 */
@@ -54,9 +54,8 @@ export function createMockWsPayload(seed, options = {}) {
     timestamp: Date.now(),
     data: seed.map((item) => {
       const next = {
-        id: item.id,
-        code: item.code,
-        alertType: ALERT_TYPE_OPTIONS[Math.floor(Math.random() * ALERT_TYPE_OPTIONS.length)],
+        name: item.name,
+        type: ALERT_TYPE_OPTIONS[Math.floor(Math.random() * ALERT_TYPE_OPTIONS.length)],
       }
       if (updateCount) {
         next.count = Math.floor(Math.random() * 50) + 1

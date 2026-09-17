@@ -33,9 +33,9 @@
     </div>
 
     <aside v-if="lastClick" class="click-toast">
-      点击：{{ lastClick.code
+      点击：{{ lastClick.name
       }}{{ lastClick.count != null ? `-${String(lastClick.count).padStart(3, '0')}` : '' }}
-      · {{ lastClick.alertType }}
+      · {{ lastClick.type }}
     </aside>
   </div>
 </template>
