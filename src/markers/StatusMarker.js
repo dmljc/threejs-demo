@@ -9,7 +9,8 @@
  * - 文案规则、告警色映射、textX 安全区等设计约定两边应对齐
  *
  * 【能力】
- * 1. 按告警类型切换背景图：green → 绿 / warning → 黄 / urgent → 红
+ * 1. 按告警类型切换背景色：green → 绿 / warning → 黄 / urgent → 红
+ *    （同一张 single.png 剪影，Canvas 合成着色，无需三张上色图）
  * 2. 文案由是否有 count 自动决定：
  *    - 无 count → 仅厂房名，如 "X01  >"
  *    - 有 count → 厂房名 + 数量，如 "X01-015  >"（数量补零 3 位）
@@ -18,10 +19,11 @@
  * 5. 长文案自动左移，保证「>」不画出横幅实色区；字号固定 16px / 字重 500
  *
  * 【绘制管线】
- *   PNG 背景 → Canvas 叠白字 → CanvasTexture → THREE.Sprite（billboard）
+ *   纯色填充 → destination-in 叠 single.png 剪影 → Canvas 叠白字
+ *   → CanvasTexture → THREE.Sprite（billboard）
  *
  * 【依赖】 three
- * 【资源】 public/green.png | yellow.png | red.png（当前 284×154）
+ * 【资源】 public/single.png（156×197，白色不透明剪影 + 透明底）
  *
  * ============================================================================
  * 使用案例
@@ -97,19 +99,22 @@
 import * as THREE from 'three'
 
 // ===========================================================================
-// 1. 告警类型 ↔ 背景图
+// 1. 告警类型 ↔ 背景色（同一张剪影 mask）
 // ===========================================================================
 
+/** 标注外形剪影（白色实心 + 透明底），着色时作 Canvas / CSS mask */
+export const MARKER_MASK_URL = '/single.png'
+
 /**
- * 内部标准类型对应的背景图路径
+ * 内部标准类型对应的背景色
  * - normal  ：绿色（由入参 green 映射而来）
  * - warning ：黄色
  * - urgent  ：红色
  */
-export const ALERT_ASSETS = {
-  normal: '/green.png',
-  warning: '/yellow.png',
-  urgent: '/red.png',
+export const ALERT_COLORS = {
+  normal: '#1f9d55',
+  warning: '#d4a017',
+  urgent: '#e11d2e',
 }
 
 /**
@@ -135,12 +140,12 @@ export function resolveType(type) {
 }
 
 /**
- * 根据告警类型取背景图 URL
+ * 根据告警类型取背景色
  * @param {string} [type]
- * @returns {string}
+ * @returns {string} CSS 颜色，如 #1f9d55
  */
-export function getAlertAsset(type) {
-  return ALERT_ASSETS[resolveType(type)]
+export function getAlertColor(type) {
+  return ALERT_COLORS[resolveType(type)] || ALERT_COLORS.normal
 }
 
 /**
@@ -179,51 +184,49 @@ export function formatMarkerLabel(name, count) {
 }
 
 // ===========================================================================
-// 2. 标注尺寸 / 锚点（与背景 PNG 对齐，改图时同步调整）
+// 2. 标注尺寸 / 锚点（与 single.png 对齐，改图时同步调整）
 // ===========================================================================
 
-/** 背景图原始宽度（像素） */
-export const MARKER_IMAGE_WIDTH = 284
-/** 背景图原始高度（像素） */
-export const MARKER_IMAGE_HEIGHT = 154
+/** 剪影原图宽度（像素） */
+export const MARKER_IMAGE_WIDTH = 156
+/** 剪影原图高度（像素） */
+export const MARKER_IMAGE_HEIGHT = 197
 /** Canvas 超采样倍率，越大文字越清晰、性能开销越大 */
 export const MARKER_SCALE = 2
 /**
  * Sprite 锚点 X（0~1）
- * 约等于圆形中心在整张图中的水平比例，保证尖角对准世界坐标
+ * 对准底部箭头中心（源图约 x=77 / 156），保证尖角对准世界坐标
  */
-export const MARKER_ANCHOR_X = 0.22
+export const MARKER_ANCHOR_X = 77 / MARKER_IMAGE_WIDTH
 /** Sprite 锚点 Y：0 表示底部尖角对齐 position */
 export const MARKER_ANCHOR_Y = 0
 /**
  * 横幅文字默认起点 X（相对原图像素）
- * 短文案（仅厂房名）用此值；长文案会按宽度自动左移
+ * 左侧圆帽右侧；短文案用此值，长文案会按宽度自动左移
  */
-export const MARKER_TEXT_X = 148
+export const MARKER_TEXT_X = 52
 /**
  * 长文案允许的最左起点（相对原图像素）
- * 紧贴圆形右缘外侧，尽量把 > 留在横幅内
+ * 紧贴圆帽右缘外侧，尽量把 > 留在横幅内
  */
-export const MARKER_TEXT_X_MIN = 118
+export const MARKER_TEXT_X_MIN = 44
 /**
  * 文案（含 >）右边缘上限（相对原图像素）
- * 约等于短文案「X06 >」的右边缘，长文案与之对齐
+ * 横幅右缘内侧留白
  */
-export const MARKER_TEXT_X_MAX_RIGHT = 236
+export const MARKER_TEXT_X_MAX_RIGHT = 140
 /**
  * 横幅文字起点 Y（相对原图像素）
- * 对齐圆形 / 横幅垂直中线（实测约 y=60~64）
+ * 对齐顶部胶囊垂直中线（源图约 y=24）
  */
-export const MARKER_TEXT_Y = 64
+export const MARKER_TEXT_Y = 24
 /** 设计稿字号（显示像素），固定 16px，不可缩放 */
 export const MARKER_DOM_FONT_SIZE = 16
 /**
- * Canvas 源图字号：16px 映射到 284×154 源图
- * 显示高 80 → 16 * 154/80 ≈ 31；绘制时固定，不随文案长短变化
+ * Canvas 源图字号：DOM 与源图 1:1，直接用 16px
+ * 绘制时固定，不随文案长短变化
  */
-export const MARKER_FONT_SIZE = Math.round(
-  MARKER_DOM_FONT_SIZE * (MARKER_IMAGE_HEIGHT / 80),
-)
+export const MARKER_FONT_SIZE = MARKER_DOM_FONT_SIZE
 /** 字重：设计稿固定 500 */
 export const MARKER_FONT_WEIGHT = 500
 /** 字体栈：与设计稿 Source Han Sans SC 一致 */
@@ -267,7 +270,7 @@ export function resolveMarkerTextX(ctx, main, arrow, scale = 1) {
 /**
  * 创建自定义状态标注
  *
- * 实现方式：Canvas 绘制「背景图 + 文案」→ CanvasTexture → Sprite（始终朝向相机）
+ * 实现方式：Canvas 绘制「纯色 + single.png 剪影 + 文案」→ CanvasTexture → Sprite（始终朝向相机）
  *
  * @param {object} options
  * @param {string} options.type  告警类型：urgent | warning | green
@@ -295,7 +298,7 @@ export function createStatusMarker({
 
   const material = new THREE.SpriteMaterial({
     map: texture,
-    transparent: true, // 背景图含透明区域
+    transparent: true, // 剪影外为透明，供点击穿透
     depthTest: true,
     depthWrite: false, // 避免透明排序异常
   })
@@ -321,22 +324,30 @@ export function createStatusMarker({
     canvas, // 透明度命中检测用
   }
 
-  const bgImage = new Image()
-  bgImage.crossOrigin = 'anonymous'
-  let bgReady = false // 背景图未加载完时禁止绘制
+  const maskImage = new Image()
+  maskImage.crossOrigin = 'anonymous'
+  let maskReady = false // 剪影未加载完时禁止绘制
 
-  /** 重绘：背景图 + 文案；数据变更后调用 */
+  /** 重绘：告警色填满 → mask 剪影 → 文案；数据变更后调用 */
   const draw = () => {
-    if (!bgReady) return
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
-    ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height)
+    if (!maskReady) return
+    const w = canvas.width
+    const h = canvas.height
+    ctx.clearRect(0, 0, w, h)
+    ctx.globalCompositeOperation = 'source-over'
+    ctx.fillStyle = getAlertColor(sprite.userData.type)
+    ctx.fillRect(0, 0, w, h)
+    // 只保留剪影不透明区域的填色
+    ctx.globalCompositeOperation = 'destination-in'
+    ctx.drawImage(maskImage, 0, 0, w, h)
+    ctx.globalCompositeOperation = 'source-over'
 
     const { main, arrow } = getMarkerLabelParts(
       sprite.userData.name,
       sprite.userData.count,
     )
     const S = MARKER_SCALE
-    // 设计稿固定：font-weight 500 / font-size 16px（源图映射为 MARKER_FONT_SIZE）
+    // 设计稿固定：font-weight 500 / font-size 16px
     ctx.font = `${MARKER_FONT_WEIGHT} ${MARKER_FONT_SIZE * S}px ${MARKER_FONT_FAMILY}`
     ctx.fillStyle = '#ffffff'
     ctx.textAlign = 'left'
@@ -363,28 +374,37 @@ export function createStatusMarker({
   }
 
   /**
-   * 加载指定告警类型的背景图并重绘
-   * @param {string} type 内部标准类型 normal | warning | urgent
+   * 加载剪影 mask（各告警色共用，只加载一次）
    */
-  const loadBackground = (type) =>
+  const loadMask = () =>
     new Promise((resolve, reject) => {
-      bgReady = false
-      bgImage.onload = () => {
-        bgReady = true
+      if (maskReady) {
+        draw()
+        resolve()
+        return
+      }
+      maskImage.onload = () => {
+        maskReady = true
         draw()
         resolve()
       }
-      bgImage.onerror = reject
-      bgImage.src = getAlertAsset(type)
+      maskImage.onerror = reject
+      maskImage.src = MARKER_MASK_URL
+      // 命中缓存时 onload 可能已错过
+      if (maskImage.complete && maskImage.naturalWidth > 0) {
+        maskReady = true
+        draw()
+        resolve()
+      }
     })
 
   // 首次加载完成后再加入场景更稳妥：await marker.ready
-  const ready = loadBackground(initialType).then(() => sprite)
+  const ready = loadMask().then(() => sprite)
 
   return {
     /** Three.js Sprite，加入 scene 即可显示 */
     sprite,
-    /** Promise：背景图与首帧绘制完成 */
+    /** Promise：剪影与首帧绘制完成 */
     ready,
     /** 当前告警类型（内部标准值） */
     get type() {
@@ -407,18 +427,17 @@ export function createStatusMarker({
       draw()
     },
     /**
-     * 按告警类型切换背景色
+     * 按告警类型切换背景色（同一张 mask，无需重新加载图片）
      * @param {string} nextType urgent | warning | green
      * @returns {Promise<string>} 规范化后的内部类型
      */
     async updateType(nextType) {
       const normalized = resolveType(nextType)
-      // 类型未变且背景已就绪，跳过重复加载
-      if (normalized === sprite.userData.type && bgReady) {
+      if (normalized === sprite.userData.type && maskReady) {
         return sprite.userData.type
       }
       sprite.userData.type = normalized
-      await loadBackground(normalized)
+      draw()
       return normalized
     },
     /**

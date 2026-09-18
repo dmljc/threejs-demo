@@ -10,7 +10,7 @@
  *
  * 【标注架构 · DOM-only】
  *   1. 虚拟锚点：只存 position / userData，不创建 THREE.Sprite
- *   2. HTML 叠加层：PNG 背景 + 白字，用 Vector3.project 跟 3D 点
+ *   2. HTML 叠加层：single.png 作 CSS mask + 告警色填充 + 白字，用 Vector3.project 跟 3D 点
  *   3. 点击：DOM click（如点 X12 → goX12）
  *
  * 【文件分区】
@@ -39,10 +39,11 @@
  *
  *   在 _ensureMarkerRuntime() 的 this.markerConfig 中修改：
  *
- *   assets: {
- *     normal:  'https://.../green.png',   // 正常 → 绿
- *     warning: 'https://.../yellow.png',  // 注意 → 黄
- *     urgent:  'https://.../red.png',     // 紧急 → 红
+ *   mask: 'https://openview.czy3d.com/.../single.png',  // 白色剪影，全类型共用
+ *   colors: {
+ *     normal:  '#1f9d55',  // 正常 → 绿
+ *     warning: '#d4a017',  // 注意 → 黄
+ *     urgent:  '#e11d2e',  // 紧急 → 红
  *   }
  *
  *   overviewAlarmList: [
@@ -131,27 +132,28 @@ class LowcodeComponent extends Component {
     _ensureMarkerRuntime() {
         if (!this.markerConfig) {
             this.markerConfig = {
-                assets: {
-                    // TODO: 如资源库更新，替换为最新 green / yellow / red 完整 URL
-                    // urgent→red / warning→yellow / green→normal
-                    normal:
-                        'https://openview.czy3d.com/czybucket/czy/tenant/openview/7738F2879717420B962C32CE221C69C9/2026/09/green.png',
-                    warning:
-                        'https://openview.czy3d.com/czybucket/czy/tenant/openview/7738F2879717420B962C32CE221C69C9/2026/09/yellow.png',
-                    urgent:
-                        'https://openview.czy3d.com/czybucket/czy/tenant/openview/7738F2879717420B962C32CE221C69C9/2026/09/red.png',
+                /** 标注外形剪影（白色实心 + 透明底），全类型共用 */
+                mask:
+                    'https://openview.czy3d.com/czybucket/czy/tenant/openview/7738F2879717420B962C32CE221C69C9/2026/09/single.png',
+                /** 告警类型 → CSS 背景色（与 StatusMarker.js ALERT_COLORS 对齐） */
+                colors: {
+                    normal: '#1f9d55',
+                    warning: '#d4a017',
+                    urgent: '#e11d2e',
                 },
-                /** 背景 PNG 源图尺寸（文字 left% / measureText 映射用，改图时同步） */
-                imageWidth: 284,
-                imageHeight: 154,
+                /** 剪影源图尺寸（文字 left% / measureText 映射用，改图时同步） */
+                imageWidth: 156,
+                imageHeight: 197,
+                /** 底部箭头中心占源图宽度比例，transform 用它对准投影点 */
+                anchorX: 77 / 156,
                 /** 短文案默认起点 X（相对源图像素）；长文案会按宽度自动左移 */
-                textX: 148,
-                /** 长文案允许的最左起点（圆形右缘外侧） */
-                textXMin: 118,
-                /** 文案（含 >）右边缘上限，与短文案右缘大致对齐 */
-                textXMaxRight: 236,
-                /** 源图测宽字号：16 * 154/80 ≈ 31，仅用于 measureText，DOM 仍显示 16px */
-                fontSize: 31,
+                textX: 52,
+                /** 长文案允许的最左起点（圆帽右缘外侧） */
+                textXMin: 44,
+                /** 文案（含 >）右边缘上限，横幅右缘内侧留白 */
+                textXMaxRight: 140,
+                /** 源图测宽字号：DOM 与源图 1:1，与设计稿 16px 一致 */
+                fontSize: 16,
                 /** 设计稿固定：font-weight:500; font-size:16px; 不可随文案长短缩放 */
                 domFontSize: 16,
                 domLineHeight: 24,
@@ -161,12 +163,12 @@ class LowcodeComponent extends Component {
                 domTextShadow: '0px 2px 4px rgba(0,0,0,0.5)',
                 /**
                  * 文字垂直位置（相对 DOM 标注高度 %）
-                 * 对齐圆形/横幅中心约 41.6%，勿用整图几何中心（尖角会把中心拉低）
+                 * 对齐顶部胶囊中心约 12.2%（源图 y≈24 / 197）
                  */
-                domTextTopPercent: 41.6,
-                /** DOM 标注显示尺寸（约等于源图一半，横幅可视高度贴近设计 24px） */
-                domWidth: 148,
-                domHeight: 80,
+                domTextTopPercent: 12.2,
+                /** DOM 标注显示尺寸（与源图 1:1，胶囊高度贴近 16px 字号） */
+                domWidth: 156,
+                domHeight: 197,
                 /** 是否按场景包围盒抬高 overviewAlarmList.position */
                 autoFit: true,
                 /** 等场景/播放器就绪的延迟（ms），OpenView 启动较慢时可加大 */
@@ -422,12 +424,11 @@ class LowcodeComponent extends Component {
                         );
                     }
                 },
-                /** WS 推送告警类型时切换背景图 */
+                /** WS 推送告警类型时切换背景色 */
                 updateType: (nextType) => {
                     userData.type = this._markerResolveType(nextType);
                     if (sprite._domEl) {
-                        const url = this._markerGetAsset(userData.type);
-                        if (url) sprite._domEl.style.backgroundImage = `url("${url}")`;
+                        this._markerPaintDomSkin(sprite._domEl, userData.type);
                     }
                     return Promise.resolve(userData.type);
                 },
@@ -451,9 +452,8 @@ class LowcodeComponent extends Component {
             'position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);z-index:9999;pointer-events:none;display:flex;gap:12px;';
         this._markerGetAlarmList().forEach((item) => {
             const el = document.createElement('div');
-            const url = this._markerGetAsset(item.type);
             el.style.cssText = `${this._markerDomShellStyle()};position:relative;transform:none;`;
-            if (url) el.style.backgroundImage = `url("${url}")`;
+            this._markerPaintDomSkin(el, item.type);
             this._markerFillDomLabel(el, item.name, item.count);
             layer.appendChild(el);
         });
@@ -851,9 +851,11 @@ class LowcodeComponent extends Component {
         });
     }
 
-    /** 无 PNG 时的纯色兜底（urgent 红 / warning 黄 / normal 绿） */
+    /** 告警类型对应填充色（urgent 红 / warning 黄 / normal 绿） */
     _markerAlertColor(type) {
         const key = this._markerResolveType(type);
+        const colors = (this.markerConfig && this.markerConfig.colors) || {};
+        if (colors[key]) return { fill: colors[key], edge: colors[key] };
         if (key === 'urgent') return { fill: '#e11d2e', edge: '#ff6b6b' };
         if (key === 'warning') return { fill: '#d4a017', edge: '#f5d76e' };
         return { fill: '#1f9d55', edge: '#6ee7a8' };
@@ -876,11 +878,58 @@ class LowcodeComponent extends Component {
         return map[String(type).trim().toLowerCase()] || 'normal';
     }
 
-    /** 按告警类型取背景 PNG URL */
-    _markerGetAsset(type) {
-        const key = this._markerResolveType(type);
-        const assets = this.markerConfig.assets || {};
-        return assets[key] || assets.normal || '';
+    /** 剪影 mask URL（全类型共用） */
+    _markerGetMaskUrl() {
+        const cfg = this.markerConfig || {};
+        return cfg.mask || '';
+    }
+
+    /**
+     * 用 CSS mask + background-color 给标注上色
+     * 剪影与文字分层：mask 不裁切文案；drop-shadow 放在 mask 外层以免 WebKit 失效
+     * @param {HTMLElement} el 标注外壳
+     * @param {string} type 告警类型
+     */
+    _markerPaintDomSkin(el, type) {
+        const color = this._markerAlertColor(type).fill;
+        const mask = this._markerGetMaskUrl();
+        let wrap = el.querySelector('[data-marker-bg-wrap]');
+        let bg = el.querySelector('[data-marker-bg]');
+        if (!wrap || !bg) {
+            wrap = document.createElement('div');
+            wrap.setAttribute('data-marker-bg-wrap', '1');
+            wrap.style.cssText =
+                'position:absolute;inset:0;pointer-events:none;filter:drop-shadow(0 2px 4px rgba(0,0,0,.28));';
+            bg = document.createElement('div');
+            bg.setAttribute('data-marker-bg', '1');
+            bg.style.cssText = [
+                'position:absolute',
+                'inset:0',
+                'background-repeat:no-repeat',
+                'background-position:center',
+                'background-size:100% 100%',
+                '-webkit-mask-repeat:no-repeat',
+                'mask-repeat:no-repeat',
+                '-webkit-mask-position:center',
+                'mask-position:center',
+                '-webkit-mask-size:100% 100%',
+                'mask-size:100% 100%',
+                'mask-mode:alpha',
+            ].join(';');
+            wrap.appendChild(bg);
+            el.insertBefore(wrap, el.firstChild);
+        }
+        bg.style.backgroundColor = color;
+        if (mask) {
+            const maskCss = `url("${mask}")`;
+            bg.style.webkitMaskImage = maskCss;
+            bg.style.maskImage = maskCss;
+            bg.style.backgroundImage = 'none';
+        } else {
+            bg.style.webkitMaskImage = 'none';
+            bg.style.maskImage = 'none';
+            bg.style.backgroundImage = 'none';
+        }
     }
 
     /**
@@ -896,26 +945,23 @@ class LowcodeComponent extends Component {
     }
 
     /**
-     * DOM 标注外壳样式（整张 PNG 含尖角）
-     * transform: translate(-22%, -100%) ≈ 尖角对准投影点（-22% 对齐圆中心水平）
+     * DOM 标注外壳样式（整张剪影含尖角）
+     * transform: translate(-anchorX%, -100%) ≈ 底部箭头对准投影点
      */
     _markerDomShellStyle() {
         const cfg = this.markerConfig || {};
-        const w = cfg.domWidth != null ? cfg.domWidth : 148;
-        const h = cfg.domHeight != null ? cfg.domHeight : 80;
+        const w = cfg.domWidth != null ? cfg.domWidth : 156;
+        const h = cfg.domHeight != null ? cfg.domHeight : 197;
+        const ax = cfg.anchorX != null ? cfg.anchorX : 77 / 156;
         return [
             'position:absolute',
-            'transform:translate(-22%, -100%)',
+            `transform:translate(${-(ax * 100).toFixed(2)}%, -100%)`,
             `width:${w}px`,
             `height:${h}px`,
-            'background-size:100% 100%',
-            'background-repeat:no-repeat',
-            'background-position:center',
             'pointer-events:auto',
             'cursor:pointer',
             'box-sizing:border-box',
             'user-select:none',
-            'filter:drop-shadow(0 2px 4px rgba(0,0,0,.28))',
         ].join(';');
     }
 
@@ -926,9 +972,9 @@ class LowcodeComponent extends Component {
     _markerResolveTextX(measureCtx, main, arrow, scale) {
         const cfg = this.markerConfig || {};
         const S = scale != null ? scale : 1;
-        const preferred = (cfg.textX != null ? cfg.textX : 148) * S;
-        const minX = (cfg.textXMin != null ? cfg.textXMin : 118) * S;
-        const maxRight = (cfg.textXMaxRight != null ? cfg.textXMaxRight : 236) * S;
+        const preferred = (cfg.textX != null ? cfg.textX : 52) * S;
+        const minX = (cfg.textXMin != null ? cfg.textXMin : 44) * S;
+        const maxRight = (cfg.textXMaxRight != null ? cfg.textXMaxRight : 140) * S;
         const gap = 6 * S;
         if (!measureCtx || typeof measureCtx.measureText !== 'function') {
             return preferred;
@@ -959,12 +1005,13 @@ class LowcodeComponent extends Component {
             cfg.domFontFamily ||
             'SourceHanSansSC, "Source Han Sans SC", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif';
         const shadow = cfg.domTextShadow || '0px 2px 4px rgba(0,0,0,0.5)';
-        const topPct = cfg.domTextTopPercent != null ? cfg.domTextTopPercent : 47;
-        const imgW = cfg.imageWidth || 284;
-        const imgH = cfg.imageHeight || 154;
-        const domH = cfg.domHeight != null ? cfg.domHeight : 80;
-        const domW = cfg.domWidth != null ? cfg.domWidth : 148;
-        el.innerHTML = '';
+        const topPct = cfg.domTextTopPercent != null ? cfg.domTextTopPercent : 12.2;
+        const imgW = cfg.imageWidth || 156;
+        const imgH = cfg.imageHeight || 197;
+        const domH = cfg.domHeight != null ? cfg.domHeight : 197;
+        const domW = cfg.domWidth != null ? cfg.domWidth : 156;
+        const prevLabel = el.querySelector('[data-marker-label]');
+        if (prevLabel) prevLabel.remove();
 
         // 用离屏 canvas 按源图固定字号测宽，再映射左偏移（字号本身不变）
         const measure = document.createElement('canvas').getContext('2d');
@@ -975,12 +1022,13 @@ class LowcodeComponent extends Component {
         measure.font = `${fw} ${srcFs}px ${ff}`;
         const textX = this._markerResolveTextX(measure, parts.main, parts.arrow, 1);
         const leftPct = (textX / imgW) * 100;
-        const maxRight = cfg.textXMaxRight != null ? cfg.textXMaxRight : 236;
+        const maxRight = cfg.textXMaxRight != null ? cfg.textXMaxRight : 140;
         const rightPx = Math.max(4, Math.round(domW * (1 - maxRight / imgW)));
 
         // 24×line-height 盒子中心对齐圆形水平中线（设计稿垂直居中）
         // +1px：补偿 text-shadow 向下扩散带来的视觉上浮
         const row = document.createElement('div');
+        row.setAttribute('data-marker-label', '1');
         row.style.cssText = [
             'position:absolute',
             `left:${leftPct}%`,
@@ -994,6 +1042,7 @@ class LowcodeComponent extends Component {
             `line-height:${lh}px`,
             'white-space:nowrap',
             'overflow:visible',
+            'z-index:1',
             'text-align:left',
             'font-style:normal',
             'box-sizing:border-box',
@@ -1145,10 +1194,8 @@ class LowcodeComponent extends Component {
         const nodes = this._markers.map((m, idx) => {
             const el = document.createElement('div');
             const ud = m.sprite.userData;
-            const url = this._markerGetAsset(ud.type);
             el.style.cssText = this._markerDomShellStyle();
-            if (url) el.style.backgroundImage = `url("${url}")`;
-            else el.style.background = this._markerAlertColor(ud.type).fill;
+            this._markerPaintDomSkin(el, ud.type);
             this._markerFillDomLabel(el, ud.name, ud.count);
             el.addEventListener('click', (e) => {
                 e.stopPropagation();

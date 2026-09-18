@@ -5,10 +5,11 @@
  * 可选 copy：mockAlertWebSocket.js（仅演示）
  */
 export {
-  ALERT_ASSETS,
+  MARKER_MASK_URL,
+  ALERT_COLORS,
   ALERT_TYPE_MAP,
   resolveType,
-  getAlertAsset,
+  getAlertColor,
   getMarkerLabelParts,
   formatMarkerLabel,
   resolveMarkerTextX,
