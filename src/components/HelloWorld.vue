@@ -10,7 +10,7 @@
           :class="{ active: activeDemo === 'name' }"
           @click="activeDemo = 'name'"
         >
-          Demo 1 · 图一
+          概览页
         </button>
         <button
           type="button"
@@ -18,7 +18,7 @@
           :class="{ active: activeDemo === 'nameCount' }"
           @click="activeDemo = 'nameCount'"
         >
-          Demo 2 · 图二
+          X12厂房
         </button>
       </div>
     </header>
@@ -44,14 +44,14 @@
 import { computed, ref } from 'vue'
 import MarkerDemoScene from './MarkerDemoScene.vue'
 
-/** name = 图一；nameCount = 图二 */
+/** name = 概览页；nameCount = X12厂房 */
 const activeDemo = ref('name')
 const lastClick = ref(null)
 
 const currentDesc = computed(() =>
   activeDemo.value === 'name'
-    ? '图一：厂房名称固定（如 X01），背景色随告警类型动态切换，支持点击'
-    : '图二：厂房名称固定，后拼接动态数量（如 X01-015），背景色随告警类型动态切换，支持点击',
+    ? '概览页：X06 / X03 / X02 / X12 厂房告警点，背景色随告警类型动态切换，支持点击'
+    : 'X12厂房：P01 / P02 / P03 告警点，名称后拼接动态数量（如 P01-015），背景色随告警类型动态切换，支持点击',
 )
 
 function onMarkerClick(payload) {

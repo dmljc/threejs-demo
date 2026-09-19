@@ -1,99 +1,7 @@
 /**
- * ============================================================================
- * 自定义状态标注组件（本地 Demo / 可整体 copy 到其他 Three.js 项目）
- * ============================================================================
- *
- * 【与 openview.result.js 的关系】
- * - 本文件：标准 Three.js 环境，用 Sprite + CanvasTexture 画标注，Raycaster 点击
- * - openview.result.js：OpenView 低代码环境，DOM-only 叠加层投影（平台常无 window.THREE）
- * - 文案规则、告警色映射、textX 安全区等设计约定两边应对齐
- *
- * 【能力】
- * 1. 按告警类型切换背景色：green → 绿 / warning → 黄 / urgent → 红
- *    （同一张 single.png 剪影，Canvas 合成着色，无需三张上色图）
- * 2. 文案由是否有 count 自动决定：
- *    - 无 count → 仅厂房名，如 "X01  >"
- *    - 有 count → 厂房名 + 数量，如 "X01-015  >"（数量补零 3 位）
- * 3. 运行时更新数量 / 告警类型
- * 4. Raycaster 点击拾取（透明像素可穿透，避免点到空白矩形）
- * 5. 长文案自动左移，保证「>」不画出横幅实色区；字号固定 16px / 字重 500
- *
- * 【绘制管线】
- *   纯色填充 → destination-in 叠 single.png 剪影 → Canvas 叠白字
- *   → CanvasTexture → THREE.Sprite（billboard）
- *
- * 【依赖】 three
- * 【资源】 public/single.png（156×197，白色不透明剪影 + 透明底）
- *
- * ============================================================================
- * 使用案例
- * ============================================================================
- *
- * ----- 1. 创建单个标注并加入场景 -----
- *
- *   import {
- *     createStatusMarker,
- *     createMarkerFromItem,
- *     bindMarkerPointerEvents,
- *     updateMarkers,
- *   } from './markers/StatusMarker.js'
- *
- *   const marker = createStatusMarker({
- *     type: 'urgent',      // urgent | warning | green
- *     name: 'X12',         // 唯一标识 + 展示文案（批量更新按 name 匹配）
- *     count: 15,           // 有 count → "X12-015 >"；无 count → "X12 >"
- *     position: [0, 1, 0], // 世界坐标，尖角对准该点
- *   })
- *   await marker.ready
- *   scene.add(marker.sprite)
- *
- *   // 运行时更新
- *   marker.updateCount(20)
- *   await marker.updateType('warning')
- *   marker.setPosition(2, 1, -1)
- *
- * ----- 2. 从接口 / mock 条目批量创建 -----
- *
- *   const items = [
- *     { type: 'green', name: 'X01', position: [-2, 1, -1] },
- *     { type: 'urgent', name: 'X12', count: 12, position: [2, 1, 1] },
- *   ]
- *   const markers = []
- *   for (const item of items) {
- *     const m = createMarkerFromItem(item)
- *     await m.ready
- *     scene.add(m.sprite)
- *     markers.push(m)
- *   }
- *
- * ----- 3. 绑定点击（需在组件卸载时 unbind） -----
- *
- *   const { unbind } = bindMarkerPointerEvents({
- *     renderer,
- *     getCamera: () => camera,
- *     getMarkers: () => markers,
- *     onClick: (info) => {
- *       // info: { name, count, type, position, originalEvent }
- *       console.log('点击标注', info.name)
- *     },
- *   })
- *   // onBeforeUnmount: unbind()
- *
- * ----- 4. WebSocket / HTTP 批量更新 -----
- *
- *   // payload 按 name 匹配
- *   await updateMarkers(markers, [
- *     { name: 'X12', type: 'urgent', count: 28 },
- *     { name: 'X01', type: 'warning' },
- *   ])
- *
- * ----- 5. 销毁 -----
- *
- *   markers.forEach((m) => {
- *     scene.remove(m.sprite)
- *     m.dispose()
- *   })
- * ============================================================================
+ * Three.js 告警标注核心：CanvasTexture + Sprite。
+ * 支持告警色、可选数量、动态更新、透明区域穿透点击和资源释放。
+ * OpenView 对应实现位于 openview.result.js。
  */
 
 import * as THREE from 'three'
@@ -102,41 +10,28 @@ import * as THREE from 'three'
 // 1. 告警类型 ↔ 背景色（同一张剪影 mask）
 // ===========================================================================
 
-/** 标注外形剪影（白色实心 + 透明底），着色时作 Canvas / CSS mask */
-export const MARKER_MASK_URL = '/single.png'
+/** 标注外形剪影（白色实心 + 透明底） */
+const MARKER_MASK_URL = '/single.png'
 
-/**
- * 内部标准类型对应的背景色
- * - normal  ：绿色（由入参 green 映射而来）
- * - warning ：黄色
- * - urgent  ：红色
- */
-export const ALERT_COLORS = {
-  normal: '#1f9d55',
+/** 业务告警类型对应的背景色 */
+const ALERT_COLORS = {
+  green: '#1f9d55',
   warning: '#d4a017',
   urgent: '#e11d2e',
 }
 
 /**
- * 业务入参 → 内部标准类型
- * 对外只暴露三种：urgent / warning / green
- */
-export const ALERT_TYPE_MAP = {
-  urgent: 'urgent', // 紧急 → 红
-  warning: 'warning', // 注意 → 黄
-  green: 'normal', // 正常 → 绿
-}
-
-/**
- * 将任意入参规范化为 normal | warning | urgent
- * 未识别时回退为 normal（绿）
+ * 将业务入参规范化为 green | warning | urgent。
+ * 兼容旧值 normal，但回调始终返回业务值 green。
  * @param {string} [type]
- * @returns {'normal'|'warning'|'urgent'}
+ * @returns {'green'|'warning'|'urgent'}
  */
-export function resolveType(type) {
-  if (type == null || type === '') return 'normal'
+function resolveType(type) {
+  if (type == null || type === '') return 'green'
   const key = String(type).trim().toLowerCase()
-  return ALERT_TYPE_MAP[key] || 'normal'
+  if (key === 'urgent' || key === 'red') return 'urgent'
+  if (key === 'warning' || key === 'yellow') return 'warning'
+  return 'green'
 }
 
 /**
@@ -144,8 +39,8 @@ export function resolveType(type) {
  * @param {string} [type]
  * @returns {string} CSS 颜色，如 #1f9d55
  */
-export function getAlertColor(type) {
-  return ALERT_COLORS[resolveType(type)] || ALERT_COLORS.normal
+function getAlertColor(type) {
+  return ALERT_COLORS[resolveType(type)]
 }
 
 /**
@@ -159,7 +54,7 @@ export function getAlertColor(type) {
  * getMarkerLabelParts('X01', null)  // { main: 'X01', arrow: '>' }
  * getMarkerLabelParts('X01', 15)    // { main: 'X01-015', arrow: '>' }
  */
-export function getMarkerLabelParts(name, count) {
+function getMarkerLabelParts(name, count) {
   const mainName = name == null ? '' : String(name)
   if (count == null || count === '') {
     return { main: mainName, arrow: '>' }
@@ -168,76 +63,56 @@ export function getMarkerLabelParts(name, count) {
   return { main: `${mainName}-${String(count).padStart(3, '0')}`, arrow: '>' }
 }
 
-/**
- * 组装标注文案（主文字与箭头以双空格分隔，仅作调试/兼容）
- * @param {string|null|undefined} name 厂房名称（固定）
- * @param {number|string|null|undefined} count 实时数量
- * @returns {string}
- *
- * @example
- * formatMarkerLabel('X01', null)  // "X01  >"
- * formatMarkerLabel('X01', 15)    // "X01-015  >"
- */
-export function formatMarkerLabel(name, count) {
-  const { main, arrow } = getMarkerLabelParts(name, count)
-  return `${main}  ${arrow}`
-}
-
 // ===========================================================================
 // 2. 标注尺寸 / 锚点（与 single.png 对齐，改图时同步调整）
 // ===========================================================================
 
 /** 剪影原图宽度（像素） */
-export const MARKER_IMAGE_WIDTH = 156
+const MARKER_IMAGE_WIDTH = 156
 /** 剪影原图高度（像素） */
-export const MARKER_IMAGE_HEIGHT = 197
+const MARKER_IMAGE_HEIGHT = 197
 /** Canvas 超采样倍率，越大文字越清晰、性能开销越大 */
-export const MARKER_SCALE = 2
+const MARKER_SCALE = 2
 /**
  * Sprite 锚点 X（0~1）
  * 对准底部箭头中心（源图约 x=77 / 156），保证尖角对准世界坐标
  */
-export const MARKER_ANCHOR_X = 77 / MARKER_IMAGE_WIDTH
+const MARKER_ANCHOR_X = 77 / MARKER_IMAGE_WIDTH
 /** Sprite 锚点 Y：0 表示底部尖角对齐 position */
-export const MARKER_ANCHOR_Y = 0
+const MARKER_ANCHOR_Y = 0
 /**
  * 横幅文字默认起点 X（相对原图像素）
  * 左侧圆帽右侧；短文案用此值，长文案会按宽度自动左移
  */
-export const MARKER_TEXT_X = 52
+const MARKER_TEXT_X = 52
 /**
  * 长文案允许的最左起点（相对原图像素）
  * 紧贴圆帽右缘外侧，尽量把 > 留在横幅内
  */
-export const MARKER_TEXT_X_MIN = 44
+const MARKER_TEXT_X_MIN = 44
 /**
  * 文案（含 >）右边缘上限（相对原图像素）
  * 横幅右缘内侧留白
  */
-export const MARKER_TEXT_X_MAX_RIGHT = 140
+const MARKER_TEXT_X_MAX_RIGHT = 140
 /**
  * 横幅文字起点 Y（相对原图像素）
  * 对齐顶部胶囊垂直中线（源图约 y=24）
  */
-export const MARKER_TEXT_Y = 24
-/** 设计稿字号（显示像素），固定 16px，不可缩放 */
-export const MARKER_DOM_FONT_SIZE = 16
-/**
- * Canvas 源图字号：DOM 与源图 1:1，直接用 16px
- * 绘制时固定，不随文案长短变化
- */
-export const MARKER_FONT_SIZE = MARKER_DOM_FONT_SIZE
+const MARKER_TEXT_Y = 24
+/** Canvas 源图字号：固定 16px，不随文案长短变化 */
+const MARKER_FONT_SIZE = 16
 /** 字重：设计稿固定 500 */
-export const MARKER_FONT_WEIGHT = 500
+const MARKER_FONT_WEIGHT = 500
 /** 字体栈：与设计稿 Source Han Sans SC 一致 */
-export const MARKER_FONT_FAMILY =
+const MARKER_FONT_FAMILY =
   'SourceHanSansSC, "Source Han Sans SC", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif'
 /** 主文字与箭头间距（相对原图像素），设计稿约 4~6px */
-export const MARKER_ARROW_GAP = 6
+const MARKER_ARROW_GAP = 6
 /** 文字阴影模糊半径（对应 CSS text-shadow blur） */
-export const MARKER_TEXT_SHADOW_BLUR = 4
+const MARKER_TEXT_SHADOW_BLUR = 4
 /** 文字阴影纵向偏移（对应 CSS text-shadow offset-y） */
-export const MARKER_TEXT_SHADOW_OFFSET_Y = 2
+const MARKER_TEXT_SHADOW_OFFSET_Y = 2
 
 /**
  * 按文案宽度计算绘制起点 X
@@ -251,7 +126,7 @@ export const MARKER_TEXT_SHADOW_OFFSET_Y = 2
  * @param {number} [scale=1] 与 MARKER_SCALE 一致时传入
  * @returns {number} 绘制起点 X（已乘 scale）
  */
-export function resolveMarkerTextX(ctx, main, arrow, scale = 1) {
+function resolveMarkerTextX(ctx, main, arrow, scale = 1) {
   const preferred = MARKER_TEXT_X * scale
   const minX = MARKER_TEXT_X_MIN * scale
   const maxRight = MARKER_TEXT_X_MAX_RIGHT * scale
@@ -261,6 +136,23 @@ export function resolveMarkerTextX(ctx, main, arrow, scale = 1) {
   // 未超出安全右界 → 用默认起点；否则左移，但不越过圆形右缘
   if (preferred + total <= maxRight) return preferred
   return Math.max(minX, maxRight - total)
+}
+
+/** 所有标注共用同一张已解码剪影，避免重复创建 Image。 */
+let maskPromise
+function loadMaskImage() {
+  if (!maskPromise) {
+    maskPromise = new Promise((resolve, reject) => {
+      const image = new Image()
+      image.onload = () => resolve(image)
+      image.onerror = () => {
+        maskPromise = null
+        reject(new Error(`标注剪影加载失败：${MARKER_MASK_URL}`))
+      }
+      image.src = MARKER_MASK_URL
+    })
+  }
+  return maskPromise
 }
 
 // ===========================================================================
@@ -324,13 +216,11 @@ export function createStatusMarker({
     canvas, // 透明度命中检测用
   }
 
-  const maskImage = new Image()
-  maskImage.crossOrigin = 'anonymous'
-  let maskReady = false // 剪影未加载完时禁止绘制
+  let maskImage = null
 
   /** 重绘：告警色填满 → mask 剪影 → 文案；数据变更后调用 */
   const draw = () => {
-    if (!maskReady) return
+    if (!maskImage) return
     const w = canvas.width
     const h = canvas.height
     ctx.clearRect(0, 0, w, h)
@@ -373,51 +263,18 @@ export function createStatusMarker({
     texture.needsUpdate = true
   }
 
-  /**
-   * 加载剪影 mask（各告警色共用，只加载一次）
-   */
-  const loadMask = () =>
-    new Promise((resolve, reject) => {
-      if (maskReady) {
-        draw()
-        resolve()
-        return
-      }
-      maskImage.onload = () => {
-        maskReady = true
-        draw()
-        resolve()
-      }
-      maskImage.onerror = reject
-      maskImage.src = MARKER_MASK_URL
-      // 命中缓存时 onload 可能已错过
-      if (maskImage.complete && maskImage.naturalWidth > 0) {
-        maskReady = true
-        draw()
-        resolve()
-      }
-    })
-
   // 首次加载完成后再加入场景更稳妥：await marker.ready
-  const ready = loadMask().then(() => sprite)
+  const ready = loadMaskImage().then((image) => {
+    maskImage = image
+    draw()
+    return sprite
+  })
 
   return {
     /** Three.js Sprite，加入 scene 即可显示 */
     sprite,
     /** Promise：剪影与首帧绘制完成 */
     ready,
-    /** 当前告警类型（内部标准值） */
-    get type() {
-      return sprite.userData.type
-    },
-    /** 厂房名称 */
-    get name() {
-      return sprite.userData.name
-    },
-    /** 当前数量 */
-    get count() {
-      return sprite.userData.count
-    },
     /**
      * 更新实时数量（厂房 name 不变）
      * @param {number|string} nextCount
@@ -429,25 +286,14 @@ export function createStatusMarker({
     /**
      * 按告警类型切换背景色（同一张 mask，无需重新加载图片）
      * @param {string} nextType urgent | warning | green
-     * @returns {Promise<string>} 规范化后的内部类型
+     * @returns {string} 规范化后的业务类型
      */
-    async updateType(nextType) {
+    updateType(nextType) {
       const normalized = resolveType(nextType)
-      if (normalized === sprite.userData.type && maskReady) {
-        return sprite.userData.type
-      }
+      if (normalized === sprite.userData.type) return normalized
       sprite.userData.type = normalized
       draw()
       return normalized
-    },
-    /**
-     * 移动标注位置（尖角对准）
-     * @param {number} x
-     * @param {number} y
-     * @param {number} z
-     */
-    setPosition(x, y, z) {
-      sprite.position.set(x, y, z)
     },
     /** 释放 GPU 资源；从场景移除后务必调用 */
     dispose() {
@@ -638,17 +484,15 @@ export function bindMarkerPointerEvents({
  *   { name: 'X12', type: 'urgent', count: 28 },
  * ])
  */
-export async function updateMarkers(markers, payload) {
-  await Promise.all(
-    (payload || []).map(async (item) => {
-      const target = markers.find((m) => m.sprite.userData.name === item.name)
-      if (!target) return
-      if (item.count != null) {
-        target.updateCount(item.count)
-      }
-      if (item.type != null) {
-        await target.updateType(item.type)
-      }
-    }),
+export function updateMarkers(markers, payload) {
+  const markerByName = new Map(
+    markers.map((marker) => [marker.sprite.userData.name, marker]),
   )
+  const updates = payload || []
+  updates.forEach((item) => {
+    const target = markerByName.get(item.name)
+    if (!target) return
+    if (item.count != null) target.updateCount(item.count)
+    if (item.type != null) target.updateType(item.type)
+  })
 }

@@ -5,28 +5,6 @@
  * 可选 copy：mockAlertWebSocket.js（仅演示）
  */
 export {
-  MARKER_MASK_URL,
-  ALERT_COLORS,
-  ALERT_TYPE_MAP,
-  resolveType,
-  getAlertColor,
-  getMarkerLabelParts,
-  formatMarkerLabel,
-  resolveMarkerTextX,
-  MARKER_IMAGE_WIDTH,
-  MARKER_IMAGE_HEIGHT,
-  MARKER_SCALE,
-  MARKER_ANCHOR_X,
-  MARKER_ANCHOR_Y,
-  MARKER_TEXT_X,
-  MARKER_TEXT_X_MIN,
-  MARKER_TEXT_X_MAX_RIGHT,
-  MARKER_TEXT_Y,
-  MARKER_DOM_FONT_SIZE,
-  MARKER_FONT_SIZE,
-  MARKER_FONT_WEIGHT,
-  MARKER_FONT_FAMILY,
-  MARKER_ARROW_GAP,
   createStatusMarker,
   createMarkerFromItem,
   bindMarkerPointerEvents,
@@ -35,6 +13,8 @@ export {
 
 export {
   ALERT_TYPE_OPTIONS,
+  OVERVIEW_MARKER_LOCAL,
+  X12_MARKER_LOCAL,
   DEMO_BUILDINGS,
   DEMO1_MARKER_SEED,
   DEMO2_MARKER_SEED,

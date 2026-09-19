@@ -6,38 +6,50 @@
 
 export const ALERT_TYPE_OPTIONS = ['green', 'warning', 'urgent']
 
-/** 四个立方体 / 标注共用的世界坐标（y 为建筑顶面高度） */
-const DEMO_LAYOUT = [
-  { name: 'X01', x: -2.4, y: 1.0, z: -1.2, h: 1.0, color: 0x9ca3af },
-  { name: 'X06', x: 2.4, y: 1.1, z: -1.0, h: 1.1, color: 0x8b919a },
-  { name: 'X12', x: -2.2, y: 0.9, z: 1.6, h: 0.9, color: 0xa1a8b3 },
-  { name: 'X09', x: 2.2, y: 1.05, z: 1.8, h: 1.05, color: 0x949aa5 },
+/**
+ * 概览页 4 个厂房告警点（模型本地坐标，与 overview.fbx / README 一致）
+ * 场景加载后需经模型 matrix 转到世界坐标
+ */
+export const OVERVIEW_MARKER_LOCAL = [
+  { name: 'X06', position: [66, 20, -91] },
+  { name: 'X03', position: [-112, 21, -116] },
+  { name: 'X02', position: [-128, 16, 95] },
+  { name: 'X12', position: [64, 28, 80] },
 ]
 
-/** 供场景创建 4 个立方体 */
-export const DEMO_BUILDINGS = DEMO_LAYOUT.map((item) => ({
+/** @deprecated 旧立方体布局，保留导出兼容 */
+export const DEMO_BUILDINGS = OVERVIEW_MARKER_LOCAL.map((item) => ({
   w: 2.2,
-  h: item.h,
+  h: item.position[1],
   d: 1.6,
-  x: item.x,
-  z: item.z,
-  color: item.color,
+  x: item.position[0],
+  z: item.position[2],
+  color: 0x9ca3af,
 }))
 
-/** 图一 Demo：仅厂房名，背景随告警类型变 —— 4 个标注 */
+/** 图一 Demo（概览页）：仅厂房名，背景随告警类型变 */
 export const DEMO1_MARKER_SEED = [
-  { type: 'green', name: 'X01', position: [-2.4, 1.0, -1.2] },
-  { type: 'warning', name: 'X06', position: [2.4, 1.1, -1.0] },
-  { type: 'urgent', name: 'X12', position: [-2.2, 0.9, 1.6] },
-  { type: 'green', name: 'X09', position: [2.2, 1.05, 1.8] },
+  { type: 'green', name: 'X06', position: [...OVERVIEW_MARKER_LOCAL[0].position] },
+  { type: 'warning', name: 'X03', position: [...OVERVIEW_MARKER_LOCAL[1].position] },
+  { type: 'urgent', name: 'X02', position: [...OVERVIEW_MARKER_LOCAL[2].position] },
+  { type: 'green', name: 'X12', position: [...OVERVIEW_MARKER_LOCAL[3].position] },
 ]
 
-/** 图二 Demo：厂房名 + 动态数量 —— 4 个标注 */
+/**
+ * X12 厂房页 3 个告警点（模型本地坐标，与 X12.fbx / README 一致）
+ * 场景加载后需经模型 matrix 转到世界坐标
+ */
+export const X12_MARKER_LOCAL = [
+  { name: 'P01', position: [12, 16, -11] },
+  { name: 'P02', position: [23, 16, -20] },
+  { name: 'P03', position: [35, 16, -13] },
+]
+
+/** 图二 Demo（X12厂房）：厂房名 + 动态数量 */
 export const DEMO2_MARKER_SEED = [
-  { type: 'urgent', name: 'X01', count: 1, position: [-2.4, 1.0, -1.2] },
-  { type: 'warning', name: 'X06', count: 2, position: [2.4, 1.1, -1.0] },
-  { type: 'green', name: 'X12', count: 8, position: [-2.2, 0.9, 1.6] },
-  { type: 'warning', name: 'X09', count: 15, position: [2.2, 1.05, 1.8] },
+  { type: 'urgent', name: 'P01', count: 1, position: [...X12_MARKER_LOCAL[0].position] },
+  { type: 'warning', name: 'P02', count: 2, position: [...X12_MARKER_LOCAL[1].position] },
+  { type: 'green', name: 'P03', count: 8, position: [...X12_MARKER_LOCAL[2].position] },
 ]
 
 /** @deprecated 兼容旧引用 */
