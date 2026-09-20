@@ -34,7 +34,7 @@
 
     <aside v-if="lastClick" class="click-toast">
       点击：{{ lastClick.name
-      }}{{ lastClick.count != null ? `-${String(lastClick.count).padStart(3, '0')}` : '' }}
+      }}{{ lastClick.count != null ? `-${String(lastClick.count)}` : '' }}
       · {{ lastClick.type }}
     </aside>
   </div>
@@ -51,7 +51,7 @@ const lastClick = ref(null)
 const currentDesc = computed(() =>
   activeDemo.value === 'name'
     ? '概览页：X06 / X03 / X02 / X12 厂房告警点，背景色随告警类型动态切换，支持点击'
-    : 'X12厂房：P01 / P02 / P03 告警点，名称后拼接动态数量（如 P01-015），背景色随告警类型动态切换，支持点击',
+    : 'X12厂房：F1 / F2 / F3 楼层告警点，名称后原样拼接接口数量（如 F1-1），背景色使用 floorAlarmList.color 动态切换，支持点击',
 )
 
 function onMarkerClick(payload) {

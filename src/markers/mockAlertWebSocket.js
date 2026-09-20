@@ -5,6 +5,7 @@
  */
 
 export const ALERT_TYPE_OPTIONS = ['green', 'warning', 'urgent']
+export const ALERT_COLOR_OPTIONS = ['#00B42A', '#D4A017', '#E61E1E']
 
 /**
  * 概览页 4 个厂房告警点（模型本地坐标，与 overview.fbx / README 一致）
@@ -40,16 +41,16 @@ export const DEMO1_MARKER_SEED = [
  * 场景加载后需经模型 matrix 转到世界坐标
  */
 export const X12_MARKER_LOCAL = [
-  { name: 'P01', position: [12, 16, -11] },
-  { name: 'P02', position: [23, 16, -20] },
-  { name: 'P03', position: [35, 16, -13] },
+  { name: 'F1', position: [12, 16, -14] },
+  { name: 'F2', position: [23, 16, -23] },
+  { name: 'F3', position: [35, 16, -16] },
 ]
 
-/** 图二 Demo（X12厂房）：厂房名 + 动态数量 */
+/** 图二 Demo（X12厂房）：模拟接口 floorAlarmList 数据结构 */
 export const DEMO2_MARKER_SEED = [
-  { type: 'urgent', name: 'P01', count: 1, position: [...X12_MARKER_LOCAL[0].position] },
-  { type: 'warning', name: 'P02', count: 2, position: [...X12_MARKER_LOCAL[1].position] },
-  { type: 'green', name: 'P03', count: 8, position: [...X12_MARKER_LOCAL[2].position] },
+  { name: 'F1', count: 1, color: '#E61E1E', position: [...X12_MARKER_LOCAL[0].position] },
+  { name: 'F2', count: 0, color: '#00B42A', position: [...X12_MARKER_LOCAL[1].position] },
+  { name: 'F3', count: 0, color: '#00B42A', position: [...X12_MARKER_LOCAL[2].position] },
 ]
 
 /** @deprecated 兼容旧引用 */
@@ -65,9 +66,17 @@ export function createMockWsPayload(seed, options = {}) {
     type: 'alert_update',
     timestamp: Date.now(),
     data: seed.map((item) => {
-      const next = {
-        name: item.name,
-        type: ALERT_TYPE_OPTIONS[Math.floor(Math.random() * ALERT_TYPE_OPTIONS.length)],
+      const next = { name: item.name }
+      if (item.color != null) {
+        next.color =
+          ALERT_COLOR_OPTIONS[
+            Math.floor(Math.random() * ALERT_COLOR_OPTIONS.length)
+          ]
+      } else {
+        next.type =
+          ALERT_TYPE_OPTIONS[
+            Math.floor(Math.random() * ALERT_TYPE_OPTIONS.length)
+          ]
       }
       if (updateCount) {
         next.count = Math.floor(Math.random() * 50) + 1

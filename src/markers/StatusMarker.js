@@ -11,7 +11,9 @@ import * as THREE from 'three'
 // ===========================================================================
 
 /** 标注外形剪影（白色实心 + 透明底） */
-const MARKER_MASK_URL = '/single.png'
+const MARKER_MASK_URL = '/alarm_bg.png'
+/** 左侧圆帽内的透明白色告警图标（24×24） */
+const MARKER_ICON_URL = '/icon.png'
 
 /** 业务告警类型对应的背景色 */
 const ALERT_COLORS = {
@@ -21,14 +23,21 @@ const ALERT_COLORS = {
 }
 
 /**
- * 将业务入参规范化为 green | warning | urgent。
+ * 将业务入参规范化为 green | warning | urgent，或保留合法 CSS 颜色。
  * 兼容旧值 normal，但回调始终返回业务值 green。
  * @param {string} [type]
- * @returns {'green'|'warning'|'urgent'}
+ * @returns {string}
  */
 function resolveType(type) {
   if (type == null || type === '') return 'green'
-  const key = String(type).trim().toLowerCase()
+  const value = String(type).trim()
+  if (
+    /^#([0-9a-f]{3,8})$/i.test(value) ||
+    /^(rgb|hsl)a?\(/i.test(value)
+  ) {
+    return value
+  }
+  const key = value.toLowerCase()
   if (key === 'urgent' || key === 'red') return 'urgent'
   if (key === 'warning' || key === 'yellow') return 'warning'
   return 'green'
@@ -40,37 +49,42 @@ function resolveType(type) {
  * @returns {string} CSS 颜色，如 #1f9d55
  */
 function getAlertColor(type) {
-  return ALERT_COLORS[resolveType(type)]
+  const normalized = resolveType(type)
+  return ALERT_COLORS[normalized] || normalized
 }
 
 /**
  * 拆分标注文案：主文字 + 箭头（便于控制间距与样式）
- * 有 count → "X01-015"；无 count → "X01"
+ * 有 count → 原样拼接（如 "F1-1"、"F2-0"）；无 count → "X01"
  * @param {string|null|undefined} name 厂房名称（固定）
  * @param {number|string|null|undefined} count 实时数量；null/undefined/'' 时不展示数量
  * @returns {{ main: string, arrow: string }}
  *
  * @example
  * getMarkerLabelParts('X01', null)  // { main: 'X01', arrow: '>' }
- * getMarkerLabelParts('X01', 15)    // { main: 'X01-015', arrow: '>' }
+ * getMarkerLabelParts('F1', 1)      // { main: 'F1-1', arrow: '>' }
  */
 function getMarkerLabelParts(name, count) {
   const mainName = name == null ? '' : String(name)
   if (count == null || count === '') {
     return { main: mainName, arrow: '>' }
   }
-  // 数量补零到 3 位，与设计稿一致（如 X01-001）
-  return { main: `${mainName}-${String(count).padStart(3, '0')}`, arrow: '>' }
+  return { main: `${mainName}-${String(count)}`, arrow: '>' }
 }
 
 // ===========================================================================
-// 2. 标注尺寸 / 锚点（与 single.png 对齐，改图时同步调整）
+// 2. 标注尺寸 / 锚点（与 alarm_bg.png 对齐，改图时同步调整）
 // ===========================================================================
 
 /** 剪影原图宽度（像素） */
 const MARKER_IMAGE_WIDTH = 156
 /** 剪影原图高度（像素） */
-const MARKER_IMAGE_HEIGHT = 197
+const MARKER_IMAGE_HEIGHT = 156
+/** 图标在源图中的位置，圆帽中心约为 (24, 24) */
+const MARKER_ICON_X = 12
+const MARKER_ICON_Y = 12
+const MARKER_ICON_WIDTH = 24
+const MARKER_ICON_HEIGHT = 24
 /** Canvas 超采样倍率，越大文字越清晰、性能开销越大 */
 const MARKER_SCALE = 2
 /**
@@ -117,7 +131,7 @@ const MARKER_TEXT_SHADOW_OFFSET_Y = 2
 /**
  * 按文案宽度计算绘制起点 X
  * - 短文案（如 X06）：保持 MARKER_TEXT_X，样式与设计一致
- * - 长文案（如 X12-012）：整体左移，使右边缘落在 MARKER_TEXT_X_MAX_RIGHT 内
+ * - 长文案：整体左移，使右边缘落在 MARKER_TEXT_X_MAX_RIGHT 内
  * - 字号不缩小（设计要求固定 16px / 500）
  *
  * @param {CanvasRenderingContext2D} ctx 需已设置好与绘制一致的 font
@@ -155,6 +169,23 @@ function loadMaskImage() {
   return maskPromise
 }
 
+/** 所有标注共用同一张已解码图标，避免重复创建 Image。 */
+let iconPromise
+function loadIconImage() {
+  if (!iconPromise) {
+    iconPromise = new Promise((resolve, reject) => {
+      const image = new Image()
+      image.onload = () => resolve(image)
+      image.onerror = () => {
+        iconPromise = null
+        reject(new Error(`标注图标加载失败：${MARKER_ICON_URL}`))
+      }
+      image.src = MARKER_ICON_URL
+    })
+  }
+  return iconPromise
+}
+
 // ===========================================================================
 // 3. 创建单个标注 Sprite
 // ===========================================================================
@@ -162,10 +193,10 @@ function loadMaskImage() {
 /**
  * 创建自定义状态标注
  *
- * 实现方式：Canvas 绘制「纯色 + single.png 剪影 + 文案」→ CanvasTexture → Sprite（始终朝向相机）
+ * 实现方式：Canvas 绘制「纯色 + alarm_bg.png 剪影 + icon.png 图标 + 文案」→ CanvasTexture → Sprite
  *
  * @param {object} options
- * @param {string} options.type  告警类型：urgent | warning | green
+ * @param {string} options.type  告警类型或 CSS 颜色
  * @param {string} options.name       厂房名称（固定），如 X01
  * @param {number|string|null} [options.count] 实时数量；有值则展示 name-count，否则仅 name
  * @param {number[]} options.position 世界坐标 [x, y, z]，尖角对准该点
@@ -217,10 +248,11 @@ export function createStatusMarker({
   }
 
   let maskImage = null
+  let iconImage = null
 
-  /** 重绘：告警色填满 → mask 剪影 → 文案；数据变更后调用 */
+  /** 重绘：告警色填满 → mask 剪影 → 白色图标 → 文案；数据变更后调用 */
   const draw = () => {
-    if (!maskImage) return
+    if (!maskImage || !iconImage) return
     const w = canvas.width
     const h = canvas.height
     ctx.clearRect(0, 0, w, h)
@@ -232,11 +264,20 @@ export function createStatusMarker({
     ctx.drawImage(maskImage, 0, 0, w, h)
     ctx.globalCompositeOperation = 'source-over'
 
+    // 图标保持原始白色，不参与告警色遮罩
+    const S = MARKER_SCALE
+    ctx.drawImage(
+      iconImage,
+      MARKER_ICON_X * S,
+      MARKER_ICON_Y * S,
+      MARKER_ICON_WIDTH * S,
+      MARKER_ICON_HEIGHT * S,
+    )
+
     const { main, arrow } = getMarkerLabelParts(
       sprite.userData.name,
       sprite.userData.count,
     )
-    const S = MARKER_SCALE
     // 设计稿固定：font-weight 500 / font-size 16px
     ctx.font = `${MARKER_FONT_WEIGHT} ${MARKER_FONT_SIZE * S}px ${MARKER_FONT_FAMILY}`
     ctx.fillStyle = '#ffffff'
@@ -264,11 +305,14 @@ export function createStatusMarker({
   }
 
   // 首次加载完成后再加入场景更稳妥：await marker.ready
-  const ready = loadMaskImage().then((image) => {
-    maskImage = image
-    draw()
-    return sprite
-  })
+  const ready = Promise.all([loadMaskImage(), loadIconImage()]).then(
+    ([mask, icon]) => {
+      maskImage = mask
+      iconImage = icon
+      draw()
+      return sprite
+    },
+  )
 
   return {
     /** Three.js Sprite，加入 scene 即可显示 */
@@ -284,9 +328,9 @@ export function createStatusMarker({
       draw()
     },
     /**
-     * 按告警类型切换背景色（同一张 mask，无需重新加载图片）
-     * @param {string} nextType urgent | warning | green
-     * @returns {string} 规范化后的业务类型
+     * 按告警类型或 CSS 颜色切换背景色（同一张 mask，无需重新加载图片）
+     * @param {string} nextType urgent | warning | green 或 CSS 颜色
+     * @returns {string} 规范化后的告警类型或颜色
      */
     updateType(nextType) {
       const normalized = resolveType(nextType)
@@ -305,16 +349,18 @@ export function createStatusMarker({
 
 /**
  * 从接口 / mock 数据条目创建标注
- * 字段约定：type / name / count / position（name 唯一；有 count 则带数量文案）
+ * 字段约定：color（或兼容 type）/ name / count / position。
+ * floorAlarmList 使用 color 字段传入十六进制告警色。
  * @param {object} item
- * @param {string} item.type  urgent | warning | green
+ * @param {string} [item.color] CSS 告警色，如 #E61E1E
+ * @param {string} [item.type] 兼容旧值 urgent | warning | green
  * @param {string} item.name  唯一标识兼展示名
  * @param {number|string} [item.count]
  * @param {number[]} item.position
  */
 export function createMarkerFromItem(item) {
   return createStatusMarker({
-    type: item.type,
+    type: item.color ?? item.type,
     name: item.name,
     count: item.count ?? null,
     position: item.position,
@@ -475,6 +521,7 @@ export function bindMarkerPointerEvents({
  * @param {Array<{
  *   name: string,
  *   count?: number|string,
+ *   color?: string,
  *   type?: string,
  * }>} payload 推送数据（按 name 匹配）
  *
@@ -493,6 +540,8 @@ export function updateMarkers(markers, payload) {
     const target = markerByName.get(item.name)
     if (!target) return
     if (item.count != null) target.updateCount(item.count)
-    if (item.type != null) target.updateType(item.type)
+    if (item.color != null || item.type != null) {
+      target.updateType(item.color ?? item.type)
+    }
   })
 }
