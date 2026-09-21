@@ -100,6 +100,7 @@ class LowcodeComponent extends Component {
         btnClassX12F3: 'bottom-btn btn-background-unclick',
         btnClassX12Pipe: 'bottom-btn btn-background-unclick',
       })
+      this.$('devanimation-464782d2').runAnimation();
     } else if (params.key === 'open') {
       this.setState({
         btnClassX12Close: 'bottom-btn btn-background-unclick',
@@ -109,6 +110,7 @@ class LowcodeComponent extends Component {
         btnClassX12F3: 'bottom-btn btn-background-unclick',
         btnClassX12Pipe: 'bottom-btn btn-background-unclick',
       })
+      this.$('devanimation-464782d2').runAnimation();
     } else if (params.key === 'f1') {
       this.setState({
         btnClassX12Close: 'bottom-btn btn-background-unclick',
@@ -118,6 +120,7 @@ class LowcodeComponent extends Component {
         btnClassX12F3: 'bottom-btn btn-background-unclick',
         btnClassX12Pipe: 'bottom-btn btn-background-unclick',
       })
+      this.$('devanimation-464782d2').runAnimation();
     } else if (params.key === 'f2') {
       this.setState({
         btnClassX12Close: 'bottom-btn btn-background-unclick',
@@ -127,6 +130,7 @@ class LowcodeComponent extends Component {
         btnClassX12F3: 'bottom-btn btn-background-unclick',
         btnClassX12Pipe: 'bottom-btn btn-background-unclick',
       })
+      this.$('devanimation-464782d2').runAnimation();
     } else if (params.key === 'f3') {
       this.setState({
         btnClassX12Close: 'bottom-btn btn-background-unclick',
@@ -136,6 +140,7 @@ class LowcodeComponent extends Component {
         btnClassX12F3: 'bottom-btn btn-background-click',
         btnClassX12Pipe: 'bottom-btn btn-background-unclick',
       })
+      this.$('devanimation-464782d2').runAnimation();
     } else if (params.key === 'pipe') {
       this.setState({
         btnClassX12Close: 'bottom-btn btn-background-unclick',
@@ -145,8 +150,8 @@ class LowcodeComponent extends Component {
         btnClassX12F3: 'bottom-btn btn-background-unclick',
         btnClassX12Pipe: 'bottom-btn btn-background-click',
       })
+      this.$('devanimation-464782d2').runAnimation();
     }
-
   }
 
   // ===========================================================================
@@ -206,25 +211,6 @@ class LowcodeComponent extends Component {
     this.setState({ sceneIndex: 0 }, () => {
       this._refreshMarkersAfterSceneChange();
     });
-  }
-
-  /** 触发 X12 开门动画（平台动画组件 id） */
-  runX12Open() {
-    this.$('devanimation-95339045').runAnimation();
-  }
-
-  /** 触发 X12 关门动画 */
-  runX12Close() {
-    this.$('devanimation-464782d2').runAnimation();
-  }
-
-  /** 保留按钮事件入口，不再切换选中/非选中样式。 */
-  onX12Close() {
-    this.runX12Close();
-  }
-
-  onX12Open() {
-    this.runX12Open();
   }
 
   /** 安全转普通对象，非 object 返回 {} */
