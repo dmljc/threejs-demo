@@ -16,8 +16,20 @@ class LowcodeComponent extends Component {
      * 当前场景索引
      * 0 = 首页 / 大屏概览
      * 1 = X12 厂房
+     * 必须在首帧就从 sessionStorage 恢复，否则 OpenView 会先加载概览模型。
      */
-    sceneIndex: 0,
+    sceneIndex: (function () {
+      try {
+        if (typeof window === 'undefined') return 0;
+        if (Number(window.__openViewSceneIndex) === 1) return 1;
+        if (Number(window.__openViewWsBuildingId) === 12) return 1;
+        if (window.sessionStorage) {
+          if (window.sessionStorage.getItem('openview.sceneIndex') === '1') return 1;
+          if (window.sessionStorage.getItem('openview.wsBuildingId') === '12') return 1;
+        }
+      } catch (error) {}
+      return 0;
+    })(),
     // 警告统计
     alarmStats: {},
     // 处置统计
@@ -55,21 +67,35 @@ class LowcodeComponent extends Component {
   // ===========================================================================
 
 
+  /** 首帧前恢复 sceneIndex，避免 OpenView 先用概览模型初始化播放器。 */
+  componentWillMount() {
+    this._hydrateSceneIndexFromStorage();
+  }
+
+  UNSAFE_componentWillMount() {
+    this._hydrateSceneIndexFromStorage();
+  }
+
   /** 组件挂载：先连 WS，再初始化标注 */
   componentDidMount() {
     this._ensureMarkerRuntime();
+    this._hydrateSceneIndexFromStorage();
     const buildingId = this._getWsTargetBuildingId();
     this._wsTargetBuildingId = buildingId;
-    const start = () => {
-      this.handleWss();
+    this.handleWss();
+    const wanted = this._getPersistedSceneIndex();
+    const startMarkers = () => {
       this.initStatusMarkers();
     };
-    // OpenView 场景跳转会重新挂载组件，需恢复 X12 场景状态与订阅目标。
-    if (buildingId === 12 && this.state.sceneIndex !== 1) {
-      this.setState({ sceneIndex: 1 }, start);
-    } else {
-      start();
+    if (wanted === 1) {
+      this._persistSceneIndex(1);
+      this._activateOpenViewScene(1);
+      if (this.state.sceneIndex !== 1) {
+        this.setState({ sceneIndex: 1 }, startMarkers);
+        return;
+      }
     }
+    startMarkers();
   }
 
   /** 组件卸载：销毁标注与 WebSocket */
@@ -78,6 +104,7 @@ class LowcodeComponent extends Component {
       clearTimeout(this._markerSwitchTimer);
       this._markerSwitchTimer = 0;
     }
+    this._cancelSceneRestore();
     this.destroyStatusMarkers();
     if (this.ws) {
       this.ws.onopen = null;
@@ -87,6 +114,31 @@ class LowcodeComponent extends Component {
       this.ws.close();
       this.ws = null;
     }
+  }
+
+  // x12 厂房分层动画
+  runX12Open() {
+    this.$('devanimation-464782d2').runAnimation();
+  }
+  // x12 厂房合并分层动画
+  runX12Close() {
+    this.$('devanimation-464782d2').runAnimation();
+  }
+  // x12 厂房设备1动画
+  runX12F1() {
+    this.$('devanimation-464782d2').runAnimation();
+  }
+  // x12 厂房设备2动画
+  runX12F2() {
+    this.$('devanimation-464782d2').runAnimation();
+  }
+  // x12 厂房设备3动画
+  runX12F3() {
+    this.$('devanimation-464782d2').runAnimation();
+  }
+  // x12 厂房管道动画
+  runX12Pipe() {
+    this.$('devanimation-464782d2').runAnimation();
   }
 
   // 点击x12厂房按钮组
@@ -100,7 +152,7 @@ class LowcodeComponent extends Component {
         btnClassX12F3: 'bottom-btn btn-background-unclick',
         btnClassX12Pipe: 'bottom-btn btn-background-unclick',
       })
-      this.$('devanimation-464782d2').runAnimation();
+      this.runX12Close();
     } else if (params.key === 'open') {
       this.setState({
         btnClassX12Close: 'bottom-btn btn-background-unclick',
@@ -110,7 +162,7 @@ class LowcodeComponent extends Component {
         btnClassX12F3: 'bottom-btn btn-background-unclick',
         btnClassX12Pipe: 'bottom-btn btn-background-unclick',
       })
-      this.$('devanimation-464782d2').runAnimation();
+      this.runX12Open();
     } else if (params.key === 'f1') {
       this.setState({
         btnClassX12Close: 'bottom-btn btn-background-unclick',
@@ -120,7 +172,7 @@ class LowcodeComponent extends Component {
         btnClassX12F3: 'bottom-btn btn-background-unclick',
         btnClassX12Pipe: 'bottom-btn btn-background-unclick',
       })
-      this.$('devanimation-464782d2').runAnimation();
+     this.runX12F1();
     } else if (params.key === 'f2') {
       this.setState({
         btnClassX12Close: 'bottom-btn btn-background-unclick',
@@ -130,7 +182,7 @@ class LowcodeComponent extends Component {
         btnClassX12F3: 'bottom-btn btn-background-unclick',
         btnClassX12Pipe: 'bottom-btn btn-background-unclick',
       })
-      this.$('devanimation-464782d2').runAnimation();
+      this.runX12F2();
     } else if (params.key === 'f3') {
       this.setState({
         btnClassX12Close: 'bottom-btn btn-background-unclick',
@@ -140,7 +192,7 @@ class LowcodeComponent extends Component {
         btnClassX12F3: 'bottom-btn btn-background-click',
         btnClassX12Pipe: 'bottom-btn btn-background-unclick',
       })
-      this.$('devanimation-464782d2').runAnimation();
+      this.runX12F3();
     } else if (params.key === 'pipe') {
       this.setState({
         btnClassX12Close: 'bottom-btn btn-background-unclick',
@@ -150,7 +202,21 @@ class LowcodeComponent extends Component {
         btnClassX12F3: 'bottom-btn btn-background-unclick',
         btnClassX12Pipe: 'bottom-btn btn-background-click',
       })
-      this.$('devanimation-464782d2').runAnimation();
+      this.runX12Pipe();
+    }
+  }
+
+  /**
+   * 标注点击：概览页 X12 进入厂房；X12 页 F1/F2/F3 触发对应楼层分层动画。
+   */
+  _onMarkerClick(ud) {
+    const name = ud && ud.name != null ? String(ud.name).trim().toUpperCase() : '';
+    if (name === 'X12') {
+      this.goX12();
+      return;
+    }
+    if (name === 'F1' || name === 'F2' || name === 'F3') {
+      this.btnClick(null, { key: name.toLowerCase() });
     }
   }
 
@@ -194,21 +260,29 @@ class LowcodeComponent extends Component {
    * 平台按钮可能只传事件对象，因此不能依赖 params.key 才订阅和刷新标注。
    */
   goX12(e, params) {
+    this._cancelSceneRestore();
     this._setWsTargetBuildingId(12);
+    this._persistSceneIndex(1);
     this._sendWsBuildingSubscription(12);
+    this._activateOpenViewScene(1);
     // 等 sceneIndex 生效后再销毁概览标注并挂载 X12 标注。
     this.setState({ sceneIndex: 1 }, () => {
+      this._activateOpenViewScene(1);
       this._refreshMarkersAfterSceneChange();
     });
   }
 
   /** 返回首页大屏，取消厂房订阅并重新显示标注 */
   goHome() {
+    this._cancelSceneRestore();
     this._setWsTargetBuildingId(null);
+    this._persistSceneIndex(0);
+    this._activateOpenViewScene(0);
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({ topic: 'unsubscribe' }));
     }
     this.setState({ sceneIndex: 0 }, () => {
+      this._activateOpenViewScene(0);
       this._refreshMarkersAfterSceneChange();
     });
   }
@@ -415,6 +489,111 @@ class LowcodeComponent extends Component {
     } catch (error) {
       console.warn('[WS] 保存厂房订阅状态失败', error);
     }
+    this._persistSceneIndex(buildingId === 12 ? 1 : 0);
+  }
+
+  /** 持久化低代码场景索引，刷新后首帧即可恢复 X12。 */
+  _persistSceneIndex(sceneIndex) {
+    const value = Number(sceneIndex) === 1 ? 1 : 0;
+    if (typeof window !== 'undefined') {
+      window.__openViewSceneIndex = value;
+    }
+    try {
+      window.sessionStorage.setItem('openview.sceneIndex', String(value));
+    } catch (error) {
+      console.warn('[Scene] 保存场景索引失败', error);
+    }
+  }
+
+  /** 读取刷新前应恢复的场景：1 = X12，0 = 概览。 */
+  _getPersistedSceneIndex() {
+    if (typeof window !== 'undefined' && Number(window.__openViewSceneIndex) === 1) {
+      return 1;
+    }
+    if (this._getWsTargetBuildingId() === 12) return 1;
+    try {
+      if (window.sessionStorage.getItem('openview.sceneIndex') === '1') return 1;
+    } catch (error) {}
+    return 0;
+  }
+
+  /** 在首帧前把 sceneIndex 写回 state，供 OpenView 三维组件条件渲染。 */
+  _hydrateSceneIndexFromStorage() {
+    const sceneIndex = this._getPersistedSceneIndex();
+    if (this.state && this.state.sceneIndex !== sceneIndex) {
+      this.state.sceneIndex = sceneIndex;
+    }
+  }
+
+  /**
+   * 通知 OpenView 播放器切换场景。
+   * 仅改 setState 只能换 UI/标注；现场刷新后三维模型仍可能停在概览。
+   */
+  _activateOpenViewScene(sceneIndex) {
+    const index = Number(sceneIndex) === 1 ? 1 : 0;
+    const coreMgr = typeof window !== 'undefined' ? window.coreMgr : null;
+    const sceneMgr = (coreMgr && coreMgr.sceneMgr) || null;
+    const player = this._markerGetWebglPlayer && this._markerGetWebglPlayer();
+    const targets = [sceneMgr, player, coreMgr];
+    const indexKeys = [
+      'currentIndex',
+      'sceneIndex',
+      'activeIndex',
+      'currentSceneIndex',
+      'selectedIndex',
+    ];
+    const fnNames = [
+      'switchScene',
+      'changeScene',
+      'setScene',
+      'setSceneIndex',
+      'showScene',
+      'jumpScene',
+      'gotoScene',
+      'openScene',
+      'selectScene',
+    ];
+    let switched = false;
+    targets.forEach((obj) => {
+      if (!obj || typeof obj !== 'object') return;
+      indexKeys.forEach((key) => {
+        if (typeof obj[key] === 'number') {
+          try {
+            obj[key] = index;
+            switched = true;
+          } catch (error) {}
+        }
+      });
+      fnNames.forEach((name) => {
+        if (typeof obj[name] === 'function') {
+          try {
+            obj[name](index);
+            switched = true;
+          } catch (error) {}
+        }
+      });
+    });
+    const list = []
+      .concat((sceneMgr && sceneMgr.sceneList) || [])
+      .concat((sceneMgr && sceneMgr.sceneNode) || []);
+    const unique = [];
+    list.forEach((item) => {
+      if (item && unique.indexOf(item) < 0) unique.push(item);
+    });
+    if (unique[index]) {
+      const target = unique[index];
+      ['show', 'activate', 'open', 'enter'].forEach((name) => {
+        if (typeof target[name] === 'function') {
+          try {
+            target[name]();
+            switched = true;
+          } catch (error) {}
+        }
+      });
+    }
+    if (switched) {
+      console.log('[Scene] 已请求 OpenView 切换场景', index);
+    }
   }
 
   /** 读取场景跳转前保存的目标厂房。 */
@@ -434,6 +613,15 @@ class LowcodeComponent extends Component {
     } catch (error) {
       console.warn('[WS] 读取厂房订阅状态失败', error);
       return null;
+    }
+  }
+
+  /** 取消尚未完成的刷新场景恢复，避免用户主动切页后被旧任务覆盖。 */
+  _cancelSceneRestore() {
+    this._sceneRestoreId += 1;
+    if (this._sceneRestoreTimer) {
+      clearTimeout(this._sceneRestoreTimer);
+      this._sceneRestoreTimer = 0;
     }
   }
 
@@ -538,6 +726,8 @@ class LowcodeComponent extends Component {
     if (this._markerSwitchTimer === undefined) this._markerSwitchTimer = 0;
     if (this._markerInitId === undefined) this._markerInitId = 0;
     if (this._markerInitRunning === undefined) this._markerInitRunning = false;
+    if (this._sceneRestoreId === undefined) this._sceneRestoreId = 0;
+    if (this._sceneRestoreTimer === undefined) this._sceneRestoreTimer = 0;
     return this.markerConfig;
   }
   /**
@@ -1526,8 +1716,7 @@ class LowcodeComponent extends Component {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
         console.log('[厂房标注点击-DOM]', ud);
-        // 业务：点击 X12 进入厂房场景
-        if (ud.name === 'X12') this.goX12();
+        this._onMarkerClick(ud);
       });
       layer.appendChild(el);
       // 回挂 DOM 节点，供 updateCount / updateType 刷新
