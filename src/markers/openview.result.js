@@ -402,6 +402,7 @@ class LowcodeComponent extends Component {
       this._markerDomLayer.parentNode.removeChild(this._markerDomLayer);
     }
     this._markerDomLayer = null;
+    this._markerCanvas = null;
     this._markers = [];
   }
 
@@ -546,6 +547,7 @@ class LowcodeComponent extends Component {
     // 以下运行时字段也不能写在 class 上，统一在此兜底初始化
     if (!this._markers) this._markers = []; // 标注实例列表
     if (this._markerDomLayer === undefined) this._markerDomLayer = null; // DOM 叠加层根节点
+    if (this._markerCanvas === undefined) this._markerCanvas = null; // 当前绑定的三维画布
     if (this._markerRaf === undefined) this._markerRaf = 0; // 投影 RAF id
     if (this._markerSwitchTimer === undefined) this._markerSwitchTimer = 0;
     if (this._markerInitId === undefined) this._markerInitId = 0;
@@ -1039,6 +1041,9 @@ class LowcodeComponent extends Component {
       renderer,
       domElement: bestCanvas,
       ready: !!(sceneMgr && sceneMgr.ready),
+      readyKnown: !!(
+        sceneMgr && typeof sceneMgr.ready === 'boolean'
+      ),
       isDesign: !!(coreMgr && coreMgr.isDesign),
       projectId: coreMgr && coreMgr.projectId,
       nodeCount: nodes.length,
@@ -1055,12 +1060,13 @@ class LowcodeComponent extends Component {
     return ctx;
   }
 
-  /**
-   * 等待场景就绪（DOM-only：有 scene 即可；尽量带上 Vector3 供投影）
-   */
+  /** 等待场景、画布和 OpenView ready 状态稳定后再挂载标注。 */
   _markerWhenReady(timeoutMs = 30000) {
     return new Promise((resolve, reject) => {
       const start = Date.now();
+      let stableScene = null;
+      let stableCanvas = null;
+      let stableTicks = 0;
       const tick = () => {
         const ctx = this._markerGetContext();
         let THREE = this._markerGetTHREE();
@@ -1070,7 +1076,33 @@ class LowcodeComponent extends Component {
         }
         ctx.THREE = THREE;
 
-        if (ctx.scene && (ctx.ready || ctx.scene)) {
+        const canvas = ctx.domElement;
+        let canvasUsable = false;
+        if (canvas && canvas.parentElement && canvas.isConnected !== false) {
+          const rect = canvas.getBoundingClientRect();
+          canvasUsable = rect.width > 0 && rect.height > 0;
+        }
+        if (
+          canvasUsable &&
+          ctx.scene === stableScene &&
+          canvas === stableCanvas
+        ) {
+          stableTicks += 1;
+        } else if (canvasUsable && ctx.scene) {
+          stableScene = ctx.scene;
+          stableCanvas = canvas;
+          stableTicks = 1;
+        } else {
+          stableTicks = 0;
+        }
+
+        // 某些 OpenView 版本没有 ready 布尔字段；有该字段时最多等待 5 秒。
+        const readyConfirmed =
+          !ctx.readyKnown || ctx.ready || Date.now() - start >= 5000;
+        const runtimeStable =
+          ctx.scene && canvasUsable && stableTicks >= 3 && readyConfirmed;
+
+        if (runtimeStable) {
           // 有 Vector3 立刻就绪；否则最多等 1.5s（仍可走无投影的 layout 兜底）
           if (THREE && typeof THREE.Vector3 === 'function') {
             resolve(ctx);
@@ -1090,7 +1122,10 @@ class LowcodeComponent extends Component {
           console.error('[Marker] 等待超时 dump', {
             THREE: !!THREE,
             ready: ctx.ready,
+            readyKnown: ctx.readyKnown,
             scene: !!ctx.scene,
+            canvas: !!ctx.domElement,
+            canvasStableTicks: stableTicks,
             camera: !!ctx.camera,
             player: !!ctx.player,
             sceneCount: ctx.sceneCount,
@@ -1494,6 +1529,7 @@ class LowcodeComponent extends Component {
     }
     parent.appendChild(layer);
     this._markerDomLayer = layer;
+    this._markerCanvas = canvas;
 
     const nodes = this._markers.map((m, idx) => {
       const el = document.createElement('div');
@@ -1533,10 +1569,43 @@ class LowcodeComponent extends Component {
       node.el.style.visibility = 'visible';
     };
 
+    let healthFrame = 0;
+    const requestRemount = (reason) => {
+      if (this._markerSwitchTimer) return;
+      console.warn('[Marker] 检测到场景画布变化，自动重新挂载', reason);
+      this._refreshMarkersAfterSceneChange();
+    };
+
     /** 每帧把当前场景的世界坐标投影为屏幕 left/top。 */
     const tick = () => {
       this._markerRaf = requestAnimationFrame(tick);
-      if (!this._markerDomLayer) return;
+      if (this._markerDomLayer !== layer) return;
+
+      // 首次加载时 OpenView 可能替换 canvas 或其容器；旧叠加层会因此不可见。
+      if (
+        !layer.parentElement ||
+        layer.isConnected === false ||
+        !canvas.parentElement ||
+        canvas.isConnected === false ||
+        layer.parentElement !== canvas.parentElement
+      ) {
+        requestRemount('canvas-or-layer-detached');
+        return;
+      }
+
+      // 低频确认当前活动画布，覆盖“旧 canvas 仍在 DOM、但已被新画布替换”的情况。
+      healthFrame += 1;
+      if (healthFrame % 30 === 0) {
+        const latest = this._markerGetContext();
+        if (latest.domElement && latest.domElement !== canvas) {
+          requestRemount('active-canvas-replaced');
+          return;
+        }
+        if (latest.camera && latest.camera !== camera) {
+          camera = latest.camera;
+          ctx.camera = camera;
+        }
+      }
 
       // 运行中再次尝试找 camera（OpenView 可能晚于页面脚本就绪）
       if (!camera) {
