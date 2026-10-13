@@ -514,10 +514,10 @@ class LowcodeComponent extends Component {
         textXMin: 44,
         /** 文案（含 >）右边缘上限，横幅右缘内侧留白 */
         textXMaxRight: 140,
-        /** 源图测宽字号：DOM 与源图 1:1，与设计稿 16px 一致 */
-        fontSize: 16,
-        /** 设计稿固定：font-weight:500; font-size:16px; 不可随文案长短缩放 */
-        domFontSize: 16,
+        /** 源图测宽字号：DOM 与源图 1:1，与设计稿 20px 一致 */
+        fontSize: 20,
+        /** 设计稿固定：font-weight:500; font-size:20px; 不可随文案长短缩放 */
+        domFontSize: 20,
         domLineHeight: 24,
         domFontWeight: 500,
         domFontFamily:
@@ -528,7 +528,7 @@ class LowcodeComponent extends Component {
          * 对齐顶部胶囊中心约 15.4%（源图 y≈24 / 156）
          */
         domTextTopPercent: 15.4,
-        /** DOM 标注显示尺寸（与源图 1:1，胶囊高度贴近 16px 字号） */
+        /** DOM 标注显示尺寸（与源图 1:1，胶囊高度贴近 20px 字号） */
         domWidth: 156,
         domHeight: 156,
         /** 等场景/播放器就绪的延迟（ms），OpenView 启动较慢时可加大 */
@@ -1323,7 +1323,7 @@ class LowcodeComponent extends Component {
 
   /**
    * 短文案保持 textX；长文案左移，避免「>」落到横幅淡出区外
-   * 字号固定 16px / 字重 500，不缩小
+   * 字号固定 20px / 字重 500，不缩小
    */
   _markerResolveTextX(measureCtx, main, arrow, scale) {
     const cfg = this.markerConfig || {};
@@ -1345,7 +1345,7 @@ class LowcodeComponent extends Component {
 
   /**
    * 填充 DOM 标注文字（主文案 + >）
-   * 先按源图坐标系测宽算 left%，再以设计稿 16px/500 渲染
+   * 先按源图坐标系测宽算 left%，再以设计稿 20px/500 渲染
    * @param {HTMLElement} el 标注外壳节点
    * @param {string} name 厂房名称
    * @param {number|string|null} count 数量；有值则展示 name-count
@@ -1353,8 +1353,8 @@ class LowcodeComponent extends Component {
   _markerFillDomLabel(el, name, count) {
     const parts = this._markerLabelParts(name, count);
     const cfg = this.markerConfig || {};
-    // 设计稿固定：font-size:16px; font-weight:500;
-    const fs = cfg.domFontSize != null ? cfg.domFontSize : 16;
+    // 设计稿固定：font-size:20px; font-weight:500;
+    const fs = cfg.domFontSize != null ? cfg.domFontSize : 20;
     const lh = cfg.domLineHeight != null ? cfg.domLineHeight : 24;
     const fw = cfg.domFontWeight != null ? cfg.domFontWeight : 500;
     const ff =

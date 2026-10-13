@@ -114,8 +114,8 @@ const MARKER_TEXT_X_MAX_RIGHT = 140
  * 对齐顶部胶囊垂直中线（源图约 y=24）
  */
 const MARKER_TEXT_Y = 24
-/** Canvas 源图字号：固定 16px，不随文案长短变化 */
-const MARKER_FONT_SIZE = 16
+/** Canvas 源图字号：固定 20px，不随文案长短变化 */
+const MARKER_FONT_SIZE = 20
 /** 字重：设计稿固定 500 */
 const MARKER_FONT_WEIGHT = 500
 /** 字体栈：与设计稿 Source Han Sans SC 一致 */
@@ -132,7 +132,7 @@ const MARKER_TEXT_SHADOW_OFFSET_Y = 2
  * 按文案宽度计算绘制起点 X
  * - 短文案（如 X06）：保持 MARKER_TEXT_X，样式与设计一致
  * - 长文案：整体左移，使右边缘落在 MARKER_TEXT_X_MAX_RIGHT 内
- * - 字号不缩小（设计要求固定 16px / 500）
+ * - 字号不缩小（设计要求固定 20px / 500）
  *
  * @param {CanvasRenderingContext2D} ctx 需已设置好与绘制一致的 font
  * @param {string} main 主文案
@@ -278,7 +278,7 @@ export function createStatusMarker({
       sprite.userData.name,
       sprite.userData.count,
     )
-    // 设计稿固定：font-weight 500 / font-size 16px
+    // 设计稿固定：font-weight 500 / font-size 20px
     ctx.font = `${MARKER_FONT_WEIGHT} ${MARKER_FONT_SIZE * S}px ${MARKER_FONT_FAMILY}`
     ctx.fillStyle = '#ffffff'
     ctx.textAlign = 'left'
