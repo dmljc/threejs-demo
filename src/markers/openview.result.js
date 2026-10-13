@@ -44,6 +44,8 @@ class LowcodeComponent extends Component {
     overviewAlarmList: [],
     // X12 厂房楼层告警标注（接口 floorAlarmList 与模型坐标合并）
     floorAlarmList: [],
+    // http base url
+    httpBaseUrl: 'https://115111ob8gw23.vicp.fun',
   };
 
   // 注意：OpenView 低代码运行时往往会丢掉除 state 以外的 class 字段
@@ -53,7 +55,6 @@ class LowcodeComponent extends Component {
   // ===========================================================================
   // 生命周期
   // ===========================================================================
-
 
   /** 组件挂载：先连 WS，再初始化标注 */
   componentDidMount() {
@@ -126,6 +127,7 @@ class LowcodeComponent extends Component {
         btnClassX12F3: 'bottom-btn btn-background-unclick',
         btnClassX12Pipe: 'bottom-btn btn-background-unclick',
       })
+      this.runX12Close();
     } else if (params.key === 'open') {
       this.setState({
         btnClassX12Close: 'bottom-btn btn-background-unclick',
@@ -135,6 +137,7 @@ class LowcodeComponent extends Component {
         btnClassX12F3: 'bottom-btn btn-background-unclick',
         btnClassX12Pipe: 'bottom-btn btn-background-unclick',
       })
+      this.runX12Open();
     } else if (params.key === 'f1') {
       this.setState({
         btnClassX12Close: 'bottom-btn btn-background-unclick',
@@ -144,6 +147,7 @@ class LowcodeComponent extends Component {
         btnClassX12F3: 'bottom-btn btn-background-unclick',
         btnClassX12Pipe: 'bottom-btn btn-background-unclick',
       })
+      this.runX12F1();
     } else if (params.key === 'f2') {
       this.setState({
         btnClassX12Close: 'bottom-btn btn-background-unclick',
@@ -153,6 +157,7 @@ class LowcodeComponent extends Component {
         btnClassX12F3: 'bottom-btn btn-background-unclick',
         btnClassX12Pipe: 'bottom-btn btn-background-unclick',
       })
+      this.runX12F2();
     } else if (params.key === 'f3') {
       this.setState({
         btnClassX12Close: 'bottom-btn btn-background-unclick',
@@ -162,6 +167,7 @@ class LowcodeComponent extends Component {
         btnClassX12F3: 'bottom-btn btn-background-click',
         btnClassX12Pipe: 'bottom-btn btn-background-unclick',
       })
+      this.runX12F3();
     } else if (params.key === 'pipe') {
       this.setState({
         btnClassX12Close: 'bottom-btn btn-background-unclick',
@@ -171,6 +177,7 @@ class LowcodeComponent extends Component {
         btnClassX12F3: 'bottom-btn btn-background-unclick',
         btnClassX12Pipe: 'bottom-btn btn-background-click',
       })
+      this.runX12Pipe();
     }
   }
 
@@ -181,7 +188,8 @@ class LowcodeComponent extends Component {
   /** 连接实时 WebSocket，接收 init_data / ws_data */
   handleWss() {
     // const url = 'ws://10.137.162.120:8088';
-    const url = 'ws://192.168.1.2:8088';
+    // const url = 'ws://192.168.1.2:8088';
+    const url = 'https://115111ob8gw23.vicp.fun';
     this.ws = new WebSocket(`${url}/api/ws/realtime`);
 
     this.ws.onopen = () => {
