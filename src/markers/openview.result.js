@@ -19,33 +19,19 @@ class LowcodeComponent extends Component {
      * 刷新必须在首帧就是 1。若从 0 起画，播放器会先绑概览模型，之后 setState 只改 UI 和标注。
      */
     sceneIndex: this._getWsTargetBuildingId() === 12 ? 1 : 0,
-    // 警告统计
-    alarmStats: {},
-    // 处置统计
-    disposalStats: {},
-    // 流出物
-    effluentList: { X12: [], X03: [] },
-    // 设备概览
-    overviewStats: {},
-    // 设备类型
-    deviceTypes: {},
-    // 设备点检
-    inspectionStats: {},
-    // 数据监测
-    monitoringList: [],
-    // 操作日志
-    operationLogList: [],
-    // 设备告警
-    alarmList: [],
-    // 设备定检
-    inspectionList: [],
-    // 流出物折线图
-    qtcList: {},
-    // 概览页告警标注（接口数据与模型坐标合并后的完整字段）
-    overviewAlarmList: [],
-    // X12 厂房楼层告警标注（接口 floorAlarmList 与模型坐标合并）
-    floorAlarmList: [],
-    // http base url
+    alarmStats: {}, // 警告统计
+    disposalStats: {}, // 处置统计
+    effluentList: { X12: [], X03: [] }, // 流出物
+    overviewStats: {}, // 设备概览
+    deviceTypes: {}, // 设备类型
+    inspectionStats: {}, // 设备点检
+    monitoringList: [], // 数据监测
+    operationLogList: [], // 操作日志
+    alarmList: [], // 设备告警
+    inspectionList: [], // 设备定检
+    qtcList: {}, // 流出物折线图
+    overviewAlarmList: [], // 概览页告警标注（接口数据与模型坐标合并后的完整字段）
+    floorAlarmList: [], // X12 厂房楼层告警标注（接口 floorAlarmList 与模型坐标合并）
     httpBaseUrl: 'https://115111ob8gw23.vicp.fun',
   };
 
@@ -76,110 +62,42 @@ class LowcodeComponent extends Component {
 
   /** 组件卸载：销毁标注与 WebSocket */
   componentWillUnmount() {
-    if (this._markerSwitchTimer) {
-      clearTimeout(this._markerSwitchTimer);
-      this._markerSwitchTimer = 0;
-    }
+    clearTimeout(this._markerSwitchTimer);
+    this._markerSwitchTimer = 0;
     this.destroyStatusMarkers();
     if (this.ws) {
-      this.ws.onopen = null;
-      this.ws.onmessage = null;
-      this.ws.onerror = null;
-      this.ws.onclose = null;
+      ['onopen', 'onmessage', 'onerror', 'onclose'].forEach((k) => {
+        this.ws[k] = null;
+      });
       this.ws.close();
       this.ws = null;
     }
   }
 
-  // x12 厂房分层动画
-  runX12Open() {
-    this.$('devanimation-464782d2').runAnimation();
-  }
-  // x12 厂房合并分层动画
-  runX12Close() {
-    this.$('devanimation-464782d2').runAnimation();
-  }
-  // x12 厂房设备1动画
-  runX12F1() {
-    this.$('devanimation-464782d2').runAnimation();
-  }
-  // x12 厂房设备2动画
-  runX12F2() {
-    this.$('devanimation-464782d2').runAnimation();
-  }
-  // x12 厂房设备3动画
-  runX12F3() {
-    this.$('devanimation-464782d2').runAnimation();
-  }
-  // x12 厂房管道动画
-  runX12Pipe() {
+  // x12 厂房动画：分层 / 合并分层 / 设备1~3 / 管道（OpenView 按钮按方法名绑定，需保留）
+  runX12Open() { this._runX12Animation(); }
+  runX12Close() { this._runX12Animation(); }
+  runX12F1() { this._runX12Animation(); }
+  runX12F2() { this._runX12Animation(); }
+  runX12F3() { this._runX12Animation(); }
+  runX12Pipe() { this._runX12Animation(); }
+
+  _runX12Animation() {
     this.$('devanimation-464782d2').runAnimation();
   }
 
   // 点击x12厂房按钮组：只切换选中样式。
   // 分层/镜头动画由 OpenView 按钮自己绑定 runX12Open 等，这里不要再播一遍。
   btnClick(e, params) {
-    if (params.key === 'close') {
-      this.setState({
-        btnClassX12Close: 'bottom-btn btn-background-click',
-        btnClassX12Open: 'bottom-btn btn-background-unclick',
-        btnClassX12F1: 'bottom-btn btn-background-unclick',
-        btnClassX12F2: 'bottom-btn btn-background-unclick',
-        btnClassX12F3: 'bottom-btn btn-background-unclick',
-        btnClassX12Pipe: 'bottom-btn btn-background-unclick',
-      })
-      this.runX12Close();
-    } else if (params.key === 'open') {
-      this.setState({
-        btnClassX12Close: 'bottom-btn btn-background-unclick',
-        btnClassX12Open: 'bottom-btn btn-background-click',
-        btnClassX12F1: 'bottom-btn btn-background-unclick',
-        btnClassX12F2: 'bottom-btn btn-background-unclick',
-        btnClassX12F3: 'bottom-btn btn-background-unclick',
-        btnClassX12Pipe: 'bottom-btn btn-background-unclick',
-      })
-      this.runX12Open();
-    } else if (params.key === 'f1') {
-      this.setState({
-        btnClassX12Close: 'bottom-btn btn-background-unclick',
-        btnClassX12Open: 'bottom-btn btn-background-unclick',
-        btnClassX12F1: 'bottom-btn btn-background-click',
-        btnClassX12F2: 'bottom-btn btn-background-unclick',
-        btnClassX12F3: 'bottom-btn btn-background-unclick',
-        btnClassX12Pipe: 'bottom-btn btn-background-unclick',
-      })
-      this.runX12F1();
-    } else if (params.key === 'f2') {
-      this.setState({
-        btnClassX12Close: 'bottom-btn btn-background-unclick',
-        btnClassX12Open: 'bottom-btn btn-background-unclick',
-        btnClassX12F1: 'bottom-btn btn-background-unclick',
-        btnClassX12F2: 'bottom-btn btn-background-click',
-        btnClassX12F3: 'bottom-btn btn-background-unclick',
-        btnClassX12Pipe: 'bottom-btn btn-background-unclick',
-      })
-      this.runX12F2();
-    } else if (params.key === 'f3') {
-      this.setState({
-        btnClassX12Close: 'bottom-btn btn-background-unclick',
-        btnClassX12Open: 'bottom-btn btn-background-unclick',
-        btnClassX12F1: 'bottom-btn btn-background-unclick',
-        btnClassX12F2: 'bottom-btn btn-background-unclick',
-        btnClassX12F3: 'bottom-btn btn-background-click',
-        btnClassX12Pipe: 'bottom-btn btn-background-unclick',
-      })
-      this.runX12F3();
-    } else if (params.key === 'pipe') {
-      this.setState({
-        btnClassX12Close: 'bottom-btn btn-background-unclick',
-        btnClassX12Open: 'bottom-btn btn-background-unclick',
-        btnClassX12F1: 'bottom-btn btn-background-unclick',
-        btnClassX12F2: 'bottom-btn btn-background-unclick',
-        btnClassX12F3: 'bottom-btn btn-background-unclick',
-        btnClassX12Pipe: 'bottom-btn btn-background-click',
-      })
-      this.runX12Pipe();
-    }
+    const names = ['Close', 'Open', 'F1', 'F2', 'F3', 'Pipe'];
+    const active = names.find((n) => n.toLowerCase() === params.key);
+    if (!active) return;
+    const next = {};
+    names.forEach((n) => {
+      next[`btnClassX12${n}`] = `bottom-btn btn-background-${n === active ? 'click' : 'unclick'}`;
+    });
+    this.setState(next);
+    this[`runX12${active}`]();
   }
 
   // ===========================================================================
@@ -188,10 +106,7 @@ class LowcodeComponent extends Component {
 
   /** 连接实时 WebSocket，接收 init_data / ws_data */
   handleWss() {
-    // const url = 'ws://10.137.162.120:8088';
-    // const url = 'ws://192.168.1.2:8088';
-    const url = 'https://115111ob8gw23.vicp.fun';
-    this.ws = new WebSocket(`${url}/api/ws/realtime`);
+    this.ws = new WebSocket('https://115111ob8gw23.vicp.fun/api/ws/realtime');
 
     this.ws.onopen = () => {
       console.log('✅ WebSocket 连接已建立');
@@ -203,13 +118,8 @@ class LowcodeComponent extends Component {
       try {
         const msg = JSON.parse(e.data);
         if (!msg || !msg.data) return;
-        if (msg.topic === 'init_data') {
-          this.applyInitData(msg.data);
-          return;
-        }
-        if (msg.topic === 'ws_data') {
-          this.applyWsData(msg.data);
-        }
+        if (msg.topic === 'init_data') this.applyInitData(msg.data);
+        else if (msg.topic === 'ws_data') this.applyWsData(msg.data);
       } catch (error) {
         console.error('❌ 解析消息失败:', error);
       }
@@ -222,13 +132,11 @@ class LowcodeComponent extends Component {
    * 进入 X12 厂房场景（标注点击或底部按钮）
    * 平台按钮可能只传事件对象，因此不能依赖 params.key 才订阅和刷新标注。
    */
-  goX12(e, params) {
+  goX12() {
     this._setWsTargetBuildingId(12);
     this._sendWsBuildingSubscription(12);
     // 等 sceneIndex 生效后再销毁概览标注并挂载 X12 标注。
-    this.setState({ sceneIndex: 1 }, () => {
-      this._refreshMarkersAfterSceneChange();
-    });
+    this.setState({ sceneIndex: 1 }, () => this._refreshMarkersAfterSceneChange());
   }
 
   /** 返回首页大屏，取消厂房订阅并重新显示标注 */
@@ -237,9 +145,7 @@ class LowcodeComponent extends Component {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({ topic: 'unsubscribe' }));
     }
-    this.setState({ sceneIndex: 0 }, () => {
-      this._refreshMarkersAfterSceneChange();
-    });
+    this.setState({ sceneIndex: 0 }, () => this._refreshMarkersAfterSceneChange());
   }
 
   /** 安全转普通对象，非 object 返回 {} */
@@ -255,32 +161,22 @@ class LowcodeComponent extends Component {
   applyInitData(data) {
     const payload = this.asObject(data);
     const cfg = this._ensureMarkerRuntime();
-    const overviewAlarmList = this._markerMergeAlarmPositions(
-      payload.overviewAlarmList,
-      cfg.overviewMarkerPositions,
-    );
-    const floorAlarmList = this._markerMergeAlarmPositions(
-      payload.floorAlarmList,
-      cfg.x12MarkerPositions,
-    );
     // markerConfig 是标注运行时数据源，必须同步写入，不能只 setState。
-    cfg.overviewAlarmList = overviewAlarmList;
-    cfg.floorAlarmList = floorAlarmList;
-    this.setState({
-      alarmStats: payload.alarmStats || {},
-      disposalStats: payload.disposalStats || {},
-      effluentList: payload.effluentList || {},
-      overviewStats: payload.overviewStats || {},
-      deviceTypes: payload.deviceTypes || {},
-      inspectionStats: payload.inspectionStats || {},
-      monitoringList: payload.monitoringList || [],
-      operationLogList: payload.operationLogList || [],
-      alarmList: payload.alarmList || [],
-      inspectionList: payload.inspectionList || [],
-      qtcList: payload.qtcList || {},
-      overviewAlarmList,
-      floorAlarmList,
+    cfg.overviewAlarmList = this._markerMergeAlarmPositions(payload.overviewAlarmList, cfg.overviewMarkerPositions);
+    cfg.floorAlarmList = this._markerMergeAlarmPositions(payload.floorAlarmList, cfg.x12MarkerPositions);
+
+    const lists = ['monitoringList', 'operationLogList', 'alarmList', 'inspectionList'];
+    const next = {
+      overviewAlarmList: cfg.overviewAlarmList,
+      floorAlarmList: cfg.floorAlarmList,
+    };
+    [
+      'alarmStats', 'disposalStats', 'effluentList', 'overviewStats', 'deviceTypes',
+      'inspectionStats', 'qtcList', ...lists,
+    ].forEach((key) => {
+      next[key] = payload[key] || (lists.includes(key) ? [] : {});
     });
+    this.setState(next);
     this._refreshMarkersAfterSceneChange();
   }
 
@@ -290,62 +186,37 @@ class LowcodeComponent extends Component {
     if (!Object.keys(payload).length) return;
     const cfg = this._ensureMarkerRuntime();
 
-    const keys = [
-      'alarmStats',
-      'disposalStats',
-      'effluentList',
-      'overviewStats',
-      'deviceTypes',
-      'inspectionStats',
-      'monitoringList',
-      'operationLogList',
-      'alarmList',
-      'inspectionList',
-      'qtcList',
-    ];
     const next = {};
-    keys.forEach((key) => {
+    [
+      'alarmStats', 'disposalStats', 'effluentList', 'overviewStats', 'deviceTypes',
+      'inspectionStats', 'monitoringList', 'operationLogList', 'alarmList',
+      'inspectionList', 'qtcList',
+    ].forEach((key) => {
       if (this.hasOwn(payload, key)) next[key] = payload[key];
     });
-    let currentAlarmList = null;
-    let currentAlarmUpdates = null;
-    if (this.hasOwn(payload, 'overviewAlarmList')) {
-      const list = this._markerMergeAlarmUpdates(
-        cfg.overviewAlarmList,
-        payload.overviewAlarmList,
-        cfg.overviewMarkerPositions,
-      );
-      cfg.overviewAlarmList = list;
-      next.overviewAlarmList = list;
-      if (this.state.sceneIndex === 0) {
-        currentAlarmList = list;
-        currentAlarmUpdates = payload.overviewAlarmList;
+
+    // 完整告警列表：[接口字段, 坐标表, 对应场景索引]
+    let hasCurrent = false;
+    let currentUpdates = null;
+    [
+      ['overviewAlarmList', 'overviewMarkerPositions', 0],
+      ['floorAlarmList', 'x12MarkerPositions', 1],
+    ].forEach(([key, positionKey, sceneIndex]) => {
+      if (!this.hasOwn(payload, key)) return;
+      cfg[key] = next[key] = this._markerMergeAlarmUpdates(cfg[key], payload[key], cfg[positionKey]);
+      if (this.state.sceneIndex === sceneIndex) {
+        hasCurrent = true;
+        currentUpdates = payload[key];
       }
-    }
-    if (this.hasOwn(payload, 'floorAlarmList')) {
-      const list = this._markerMergeAlarmUpdates(
-        cfg.floorAlarmList,
-        payload.floorAlarmList,
-        cfg.x12MarkerPositions,
-      );
-      cfg.floorAlarmList = list;
-      next.floorAlarmList = list;
-      if (this.state.sceneIndex === 1) {
-        currentAlarmList = list;
-        currentAlarmUpdates = payload.floorAlarmList;
-      }
-    }
+    });
+
     if (Object.keys(next).length) this.setState(next);
-    if (currentAlarmList) {
+    if (hasCurrent) {
       // 标注未挂载时只触发一次初始化；挂载后永不因实时推送重建 DOM。
-      if (
-        !this._markers.length &&
-        !this._markerInitRunning &&
-        !this._markerSwitchTimer
-      ) {
+      if (!this._markers.length && !this._markerInitRunning && !this._markerSwitchTimer) {
         this._refreshMarkersAfterSceneChange();
       } else {
-        this.applyBuildingMarkers(currentAlarmUpdates);
+        this.applyBuildingMarkers(currentUpdates);
       }
     }
     this.applyBuildingMarkers(payload.buildingMarkers);
@@ -361,14 +232,13 @@ class LowcodeComponent extends Component {
     const initId = ++this._markerInitId;
     this._markerInitRunning = true;
     this._markers = [];
-    const delay = (cfg && cfg.mountDelayMs) || 0;
     // OpenView 场景/播放器可能晚于页面脚本就绪，先短暂等待
-    if (delay > 0) {
-      await new Promise((r) => setTimeout(r, delay));
+    if (cfg.mountDelayMs > 0) {
+      await new Promise((r) => setTimeout(r, cfg.mountDelayMs));
     }
 
     try {
-      const ctx = await this._markerWhenReady(30000);
+      const ctx = await this._markerWhenReady();
       // 场景切换期间旧的异步初始化结果直接丢弃
       if (initId !== this._markerInitId) return;
       this._markerMountVirtualMarkers(ctx);
@@ -384,9 +254,7 @@ class LowcodeComponent extends Component {
 
   /** 当前场景的标注层保持显示，列表由 sceneIndex 决定。 */
   syncMarkerVisibleByScene() {
-    if (this._markerDomLayer) {
-      this._markerDomLayer.style.display = 'block';
-    }
+    if (this._markerDomLayer) this._markerDomLayer.style.display = 'block';
   }
 
   /**
@@ -396,11 +264,11 @@ class LowcodeComponent extends Component {
   applyBuildingMarkers(list) {
     if (!Array.isArray(list) || !list.length || !this._markers.length) return;
     list.forEach((item) => {
-      const target = this._markers.find((m) => m.sprite.userData.name === item.name);
-      if (!target) return;
-      if (item.count != null) target.updateCount(item.count);
+      const marker = this._markers.find((m) => m.userData.name === item.name);
+      if (!marker) return;
+      if (item.count != null) this._markerSetCount(marker, item.count);
       if (item.color != null || item.type != null) {
-        target.updateType(item.color || item.type);
+        this._markerSetType(marker, item.color || item.type);
       }
     });
   }
@@ -409,38 +277,25 @@ class LowcodeComponent extends Component {
   destroyStatusMarkers() {
     this._markerInitId += 1;
     this._markerInitRunning = false;
-    if (this._markerRaf) {
-      cancelAnimationFrame(this._markerRaf);
-      this._markerRaf = 0;
-    }
-    if (this._markerDomLayer && this._markerDomLayer.parentNode) {
-      this._markerDomLayer.parentNode.removeChild(this._markerDomLayer);
-    }
+    cancelAnimationFrame(this._markerRaf);
+    this._markerRaf = 0;
+    if (this._markerDomLayer) this._markerDomLayer.remove();
     this._markerDomLayer = null;
-    this._markerCanvas = null;
     this._markers = [];
   }
 
   // ===========================================================================
-  // 厂房标注 · 内部实现（_marker 前缀）
-  // 场景探测 → 文案/样式 → DOM 投影
+  // 厂房标注 · 内部实现
+  // WS 订阅 → 运行时配置 → 场景探测 → 文案/样式 → DOM 投影
   // ===========================================================================
 
   /** 保存目标厂房，使 OpenView 场景跳转后的新组件实例能够恢复订阅。 */
   _setWsTargetBuildingId(buildingId) {
     this._wsTargetBuildingId = buildingId;
-    if (typeof window !== 'undefined') {
-      window.__openViewWsBuildingId = buildingId;
-    }
+    window.__openViewWsBuildingId = buildingId;
     try {
-      if (buildingId == null) {
-        window.sessionStorage.removeItem('openview.wsBuildingId');
-      } else {
-        window.sessionStorage.setItem(
-          'openview.wsBuildingId',
-          String(buildingId),
-        );
-      }
+      if (buildingId == null) window.sessionStorage.removeItem('openview.wsBuildingId');
+      else window.sessionStorage.setItem('openview.wsBuildingId', String(buildingId));
     } catch (error) {
       console.warn('[WS] 保存厂房订阅状态失败', error);
     }
@@ -448,30 +303,14 @@ class LowcodeComponent extends Component {
 
   /** 读取场景跳转前保存的目标厂房。 */
   _getWsTargetBuildingId() {
-    if (this._wsTargetBuildingId != null) {
-      return Number(this._wsTargetBuildingId);
-    }
-    if (
-      typeof window !== 'undefined' &&
-      window.__openViewWsBuildingId != null
-    ) {
-      return Number(window.__openViewWsBuildingId);
-    }
+    const saved = [this._wsTargetBuildingId, window.__openViewWsBuildingId].find((v) => v != null);
+    if (saved != null) return Number(saved);
     try {
       const value = window.sessionStorage.getItem('openview.wsBuildingId');
-      return value == null || value === '' ? null : Number(value);
+      return value ? Number(value) : null;
     } catch (error) {
       console.warn('[WS] 读取厂房订阅状态失败', error);
       return null;
-    }
-  }
-
-  /** 取消尚未完成的刷新场景恢复，避免用户主动切页后被旧任务覆盖。 */
-  _cancelSceneRestore() {
-    this._sceneRestoreId += 1;
-    if (this._sceneRestoreTimer) {
-      clearTimeout(this._sceneRestoreTimer);
-      this._sceneRestoreTimer = 0;
     }
   }
 
@@ -482,10 +321,7 @@ class LowcodeComponent extends Component {
       console.log('[WS] 等待连接后订阅厂房', buildingId);
       return false;
     }
-    const message = {
-      topic: 'subscribe',
-      buildingId: Number(buildingId),
-    };
+    const message = { topic: 'subscribe', buildingId: Number(buildingId) };
     this.ws.send(JSON.stringify(message));
     console.log('[WS] 已发送厂房订阅', message);
     return true;
@@ -494,158 +330,102 @@ class LowcodeComponent extends Component {
   /** 确保标注运行时字段存在（OpenView 不会保留 class 字段上的 markerConfig = {}） */
   _ensureMarkerRuntime() {
     if (!this.markerConfig) {
+      const base = 'https://openview.czy3d.com/czybucket/czy/tenant/openview/7738F2879717420B962C32CE221C69C9/2026/09';
       this.markerConfig = {
-        /** 标注外形剪影（白色实心 + 透明底），全类型共用 */
-        mask:
-          'https://openview.czy3d.com/czybucket/czy/tenant/openview/7738F2879717420B962C32CE221C69C9/2026/09/alarm_bg.png',
-        /** 左侧圆帽内的透明白色告警图标（24×24） */
-        icon:
-          'https://openview.czy3d.com/czybucket/czy/tenant/openview/7738F2879717420B962C32CE221C69C9/2026/09/icon.png',
-        /** 图标在 156×156 源图中的布局：圆帽中心约为 (24, 24) */
+        mask: `${base}/alarm_bg.png`, // 标注外形剪影（白色实心 + 透明底），全类型共用
+        icon: `${base}/icon.png`, // 左侧圆帽内的透明白色告警图标（24×24）
+        // 图标在 156×156 源图中的布局：圆帽中心约为 (24, 24)
         iconLeft: 12,
         iconTop: 12,
         iconWidth: 24,
         iconHeight: 24,
-        /** 告警类型 → CSS 背景色（与 StatusMarker.js ALERT_COLORS 对齐） */
-        colors: {
-          green: '#1f9d55',
-          warning: '#d4a017',
-          urgent: '#e11d2e',
-        },
-        /** 剪影源图尺寸（文字 left% / measureText 映射用，改图时同步） */
+        // 告警类型 → CSS 背景色（与 StatusMarker.js ALERT_COLORS 对齐）
+        colors: { green: '#1f9d55', warning: '#d4a017', urgent: '#e11d2e' },
+        // 剪影源图尺寸（文字 left% / measureText 映射用，改图时同步）
         imageWidth: 156,
         imageHeight: 156,
-        /** 底部箭头中心占源图宽度比例，transform 用它对准投影点 */
-        anchorX: 77 / 156,
-        /** 短文案默认起点 X（相对源图像素）；长文案会按宽度自动左移 */
-        textX: 52,
-        /** 长文案允许的最左起点（圆帽右缘外侧） */
-        textXMin: 44,
-        /** 文案（含 >）右边缘上限，横幅右缘内侧留白 */
-        textXMaxRight: 140,
-        /** 源图测宽字号：DOM 与源图 1:1，与设计稿 20px 一致 */
-        fontSize: 20,
-        /** 设计稿固定：font-weight:500; font-size:20px; 不可随文案长短缩放 */
+        anchorX: 77 / 156, // 底部箭头中心占源图宽度比例，transform 用它对准投影点
+        textX: 52, // 短文案默认起点 X（相对源图像素）；长文案会按宽度自动左移
+        textXMin: 44, // 长文案允许的最左起点（圆帽右缘外侧）
+        textXMaxRight: 140, // 文案（含 >）右边缘上限，横幅右缘内侧留白
+        fontSize: 20, // 源图测宽字号：DOM 与源图 1:1，与设计稿 20px 一致
+        // 设计稿固定：font-weight:500; font-size:20px; 不可随文案长短缩放
         domFontSize: 20,
         domLineHeight: 24,
         domFontWeight: 500,
         domFontFamily:
           'SourceHanSansSC, "Source Han Sans SC", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif',
         domTextShadow: '0px 2px 4px rgba(0,0,0,0.5)',
-        /**
-         * 文字垂直位置（相对 DOM 标注高度 %）
-         * 对齐顶部胶囊中心约 15.4%（源图 y≈24 / 156）
-         */
-        domTextTopPercent: 15.4,
-        /** DOM 标注显示尺寸（与源图 1:1，胶囊高度贴近 20px 字号） */
+        domTextTopPercent: 15.4, // 文字垂直位置（相对 DOM 标注高度 %），对齐顶部胶囊中心 y≈24/156
+        // DOM 标注显示尺寸（与源图 1:1，胶囊高度贴近 20px 字号）
         domWidth: 156,
         domHeight: 156,
-        /** 等场景/播放器就绪的延迟（ms），OpenView 启动较慢时可加大 */
-        mountDelayMs: 800,
-        /**
-         * 可选：OpenView 中对应模型根节点的 name。
-         * 留空时通过标注点与候选节点包围盒自动匹配。
-         */
-        modelRootNames: {
-          overview: '',
-          x12: '',
-        },
-        /** overview.fbx 告警点模型坐标，按接口 name 拼接 */
+        mountDelayMs: 800, // 等场景/播放器就绪的延迟（ms），OpenView 启动较慢时可加大
+        // 可选：OpenView 中对应模型根节点的 name。留空时通过标注点与候选节点包围盒自动匹配。
+        modelRootNames: { overview: '', x12: '' },
+        // overview.fbx 告警点模型坐标，按接口 name 拼接
         overviewMarkerPositions: {
           X06: [66, 20, -91],
           X03: [-112, 21, -116],
           X02: [-128, 16, 95],
           X12: [64, 28, 80],
         },
-        /** X12.fbx 告警点模型坐标，按接口 name 拼接 */
+        // X12.fbx 告警点模型坐标，按接口 name 拼接
         x12MarkerPositions: {
           F1: [12, 16, -14],
           F2: [23, 16, -23],
           F3: [35, 16, -16],
         },
-        /** 接口数据与坐标合并后的运行时列表 */
+        // 接口数据与坐标合并后的运行时列表
         overviewAlarmList: [],
         floorAlarmList: [],
       };
     }
     // 以下运行时字段也不能写在 class 上，统一在此兜底初始化
-    if (!this._markers) this._markers = []; // 标注实例列表
-    if (this._markerDomLayer === undefined) this._markerDomLayer = null; // DOM 叠加层根节点
-    if (this._markerCanvas === undefined) this._markerCanvas = null; // 当前绑定的三维画布
-    if (this._markerRaf === undefined) this._markerRaf = 0; // 投影 RAF id
-    if (this._markerSwitchTimer === undefined) this._markerSwitchTimer = 0;
-    if (this._markerInitId === undefined) this._markerInitId = 0;
-    if (this._markerInitRunning === undefined) this._markerInitRunning = false;
-    if (this._sceneRestoreId === undefined) this._sceneRestoreId = 0;
-    if (this._sceneRestoreTimer === undefined) this._sceneRestoreTimer = 0;
+    const runtime = {
+      _markers: [], // 标注实例列表
+      _markerDomLayer: null, // DOM 叠加层根节点
+      _markerRaf: 0, // 投影 RAF id
+      _markerSwitchTimer: 0,
+      _markerInitId: 0,
+      _markerInitRunning: false,
+    };
+    Object.keys(runtime).forEach((k) => {
+      if (this[k] === undefined) this[k] = runtime[k];
+    });
     return this.markerConfig;
   }
+
   /**
    * 保留接口全部字段，并按 name 拼接模型坐标。
    * 接口已返回 position 时优先使用接口坐标。
    */
   _markerMergeAlarmPositions(list, positionMap) {
     if (!Array.isArray(list)) return [];
-    const positions = positionMap || {};
     return list.map((item) => {
       const source = this.asObject(item);
       const position =
         Array.isArray(source.position) && source.position.length >= 3
           ? source.position.slice(0, 3)
-          : positions[source.name];
-      return {
-        ...source,
-        position: position ? [...position] : [0, 0, 0],
-      };
+          : positionMap[source.name];
+      return { ...source, position: position ? [...position] : [0, 0, 0] };
     });
   }
 
   /** 将 WS 增量按 name 合并到现有完整列表，不替换或重建标注。 */
   _markerMergeAlarmUpdates(current, updates, positionMap) {
-    const byName = new Map(
-      (Array.isArray(current) ? current : []).map((item) => [item.name, item]),
-    );
+    const byName = new Map((Array.isArray(current) ? current : []).map((item) => [item.name, item]));
     (Array.isArray(updates) ? updates : []).forEach((item) => {
       const source = this.asObject(item);
-      const previous = byName.get(source.name) || {};
-      byName.set(source.name, { ...previous, ...source });
+      byName.set(source.name, { ...(byName.get(source.name) || {}), ...source });
     });
-    return this._markerMergeAlarmPositions(
-      Array.from(byName.values()),
-      positionMap,
-    );
+    return this._markerMergeAlarmPositions(Array.from(byName.values()), positionMap);
   }
 
   /** 根据当前场景返回已拼接坐标的报警列表，name 为唯一键。 */
   _markerGetAlarmList() {
-    const cfg = this.markerConfig || {};
-    return this.state.sceneIndex === 1
-      ? cfg.floorAlarmList || []
-      : cfg.overviewAlarmList || [];
-  }
-
-  /** 统计节点及其子级中的 Mesh 数量。 */
-  _markerCountMeshes(root) {
-    if (!root) return 0;
-    let count = root.isMesh ? 1 : 0;
-    if (typeof root.traverse === 'function') {
-      root.traverse((node) => {
-        if (node !== root && node && node.isMesh) count += 1;
-      });
-    }
-    return count;
-  }
-
-  /** 按 name 精确查找模型根节点。 */
-  _markerFindNodeByName(scene, name) {
-    if (!scene || !name) return null;
-    let found = null;
-    if (typeof scene.traverse === 'function') {
-      scene.traverse((node) => {
-        if (!found && node && node.name === name) found = node;
-      });
-    }
-    return found;
+    const cfg = this.markerConfig;
+    return this.state.sceneIndex === 1 ? cfg.floorAlarmList : cfg.overviewAlarmList;
   }
 
   /**
@@ -655,13 +435,25 @@ class LowcodeComponent extends Component {
    */
   _markerFindModelRoot(scene, items, THREE) {
     if (!scene || !Array.isArray(scene.children)) return scene;
-    const cfg = this.markerConfig || {};
-    const names = cfg.modelRootNames || {};
-    const configuredName =
-      this.state.sceneIndex === 1 ? names.x12 : names.overview;
-    const configured = this._markerFindNodeByName(scene, configuredName);
-    if (configured) return configured;
+    const names = this.markerConfig.modelRootNames;
+    const configuredName = this.state.sceneIndex === 1 ? names.x12 : names.overview;
+    if (configuredName && typeof scene.traverse === 'function') {
+      let configured = null;
+      scene.traverse((node) => {
+        if (!configured && node && node.name === configuredName) configured = node;
+      });
+      if (configured) return configured;
+    }
 
+    const countMeshes = (root) => {
+      let count = 0;
+      if (typeof root.traverse === 'function') {
+        root.traverse((node) => {
+          if (node && node.isMesh) count += 1;
+        });
+      }
+      return count;
+    };
     const candidates = scene.children.filter(
       (child) =>
         child &&
@@ -669,63 +461,38 @@ class LowcodeComponent extends Component {
         !child.isLight &&
         !child.isHelper &&
         typeof child.localToWorld === 'function' &&
-        this._markerCountMeshes(child) > 0,
+        countMeshes(child) > 0,
     );
     if (!candidates.length) return scene;
 
-    if (
-      !THREE ||
-      typeof THREE.Box3 !== 'function' ||
-      typeof THREE.Vector3 !== 'function'
-    ) {
+    if (!THREE || typeof THREE.Box3 !== 'function' || typeof THREE.Vector3 !== 'function') {
       return candidates.length === 1 ? candidates[0] : scene;
     }
 
-    const localPositions = (items || []).map(
-      (item) => item.position || [0, 0, 0],
-    );
+    const localPositions = (items || []).map((item) => item.position || [0, 0, 0]);
     let best = null;
     candidates.forEach((node) => {
       try {
-        if (typeof node.updateMatrixWorld === 'function') {
-          node.updateMatrixWorld(true);
-        }
+        if (typeof node.updateMatrixWorld === 'function') node.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(node);
         if (box.isEmpty()) return;
         const size = box.getSize(new THREE.Vector3());
-        const diagonal =
-          typeof size.length === 'function'
-            ? size.length()
-            : Math.hypot(size.x, size.y, size.z);
+        const diagonal = size.length();
         // 标注尖角允许略高于模型包围盒顶部。
         const margin = Math.max(size.x, size.y, size.z, 1) * 0.08;
-        let contained = 0;
-        localPositions.forEach((position) => {
-          const point = new THREE.Vector3(
-            position[0],
-            position[1],
-            position[2],
-          );
+        const contained = localPositions.filter((p) => {
+          const point = new THREE.Vector3(p[0], p[1], p[2]);
           node.localToWorld(point);
-          if (
-            point.x >= box.min.x - margin &&
-            point.x <= box.max.x + margin &&
-            point.y >= box.min.y - margin &&
-            point.y <= box.max.y + margin &&
-            point.z >= box.min.z - margin &&
-            point.z <= box.max.z + margin
-          ) {
-            contained += 1;
-          }
-        });
-        const candidate = { node, contained, diagonal };
+          return ['x', 'y', 'z'].every(
+            (a) => point[a] >= box.min[a] - margin && point[a] <= box.max[a] + margin,
+          );
+        }).length;
         if (
           !best ||
-          candidate.contained > best.contained ||
-          (candidate.contained === best.contained &&
-            candidate.diagonal < best.diagonal)
+          contained > best.contained ||
+          (contained === best.contained && diagonal < best.diagonal)
         ) {
-          best = candidate;
+          best = { node, contained, diagonal };
         }
       } catch (error) {
         console.warn('[Marker] 模型根节点候选计算失败', error);
@@ -745,8 +512,8 @@ class LowcodeComponent extends Component {
 
   /**
    * 创建虚拟标注锚点（DOM-only 核心数据源）
-   * - 不创建真实 THREE.Sprite，只用 { position, userData } 结构兼容后续投影代码
-   * - updateCount / updateType 会同步刷新对应 DOM 节点
+   * - 不创建真实 THREE.Sprite，只保存 { position, userData, el }
+   * - _markerSetCount / _markerSetType 会同步刷新对应 DOM 节点
    */
   _markerMountVirtualMarkers(ctx) {
     const items = this._markerGetAlarmList();
@@ -755,59 +522,47 @@ class LowcodeComponent extends Component {
     if (modelRoot && typeof modelRoot.updateMatrixWorld === 'function') {
       modelRoot.updateMatrixWorld(true);
     }
+    const toWorld =
+      modelRoot &&
+      modelRoot !== ctx.scene &&
+      typeof modelRoot.localToWorld === 'function' &&
+      THREE &&
+      typeof THREE.Vector3 === 'function';
     this._markers = items.map((item) => {
-      const local = item.position || [0, 0, 0];
-      let pos = local;
-      if (
-        modelRoot &&
-        modelRoot !== ctx.scene &&
-        typeof modelRoot.localToWorld === 'function' &&
-        THREE &&
-        typeof THREE.Vector3 === 'function'
-      ) {
-        const world = new THREE.Vector3(local[0], local[1], local[2]);
-        modelRoot.localToWorld(world);
-        pos = [world.x, world.y, world.z];
+      const [x, y, z] = item.position || [0, 0, 0];
+      let position = { x, y, z };
+      if (toWorld) {
+        position = new THREE.Vector3(x, y, z);
+        modelRoot.localToWorld(position);
       }
-      const type = this._markerResolveType(item.color || item.type);
-      const userData = {
-        type,
-        color: item.color || null,
-        name: item.name,
-        count: item.count != null ? item.count : null,
-        isMarker: true,
-      };
-      // 命名沿用 sprite，便于 _markerMountDomOverlay 复用同一套读取逻辑
-      const sprite = {
-        position: { x: pos[0], y: pos[1], z: pos[2], toArray: () => [pos[0], pos[1], pos[2]] },
-        visible: true,
-        userData,
-      };
       return {
-        sprite,
-        /** WS 推送数量时重绘 DOM 文案 */
-        updateCount: (nextCount) => {
-          if (userData.count === nextCount) return;
-          userData.count = nextCount;
-          if (sprite._domEl) {
-            this._markerFillDomLabel(
-              sprite._domEl,
-              userData.name,
-              userData.count,
-            );
-          }
-        },
-        /** WS 推送告警类型时切换背景色 */
-        updateType: (nextType) => {
-          const normalized = this._markerResolveType(nextType);
-          if (userData.type === normalized) return;
-          userData.type = normalized;
-          if (sprite._domEl) {
-            this._markerPaintDomSkin(sprite._domEl, userData.type);
-          }
+        position,
+        el: null, // 挂载 DOM 后回填，供 _markerSetCount / _markerSetType 刷新
+        userData: {
+          type: this._markerResolveType(item.color || item.type),
+          color: item.color || null,
+          name: item.name,
+          count: item.count != null ? item.count : null,
+          isMarker: true,
         },
       };
     });
+  }
+
+  /** WS 推送数量时重绘 DOM 文案 */
+  _markerSetCount(marker, count) {
+    const ud = marker.userData;
+    if (ud.count === count) return;
+    ud.count = count;
+    if (marker.el) this._markerFillDomLabel(marker.el, ud.name, ud.count);
+  }
+
+  /** WS 推送告警类型时切换背景色 */
+  _markerSetType(marker, type) {
+    const normalized = this._markerResolveType(type);
+    if (marker.userData.type === normalized) return;
+    marker.userData.type = normalized;
+    if (marker.el) this._markerPaintDomSkin(marker.el, normalized);
   }
 
   /**
@@ -815,7 +570,7 @@ class LowcodeComponent extends Component {
    * 延迟可避免拿到切换前的 webglPlayer。
    */
   _refreshMarkersAfterSceneChange() {
-    if (this._markerSwitchTimer) clearTimeout(this._markerSwitchTimer);
+    clearTimeout(this._markerSwitchTimer);
     this._markerSwitchTimer = setTimeout(() => {
       this._markerSwitchTimer = 0;
       this.destroyStatusMarkers();
@@ -823,10 +578,7 @@ class LowcodeComponent extends Component {
     }, 300);
   }
 
-  /**
-   * 从 sceneMgr 上尽量找出三维播放器（字段名因 OpenView 版本而异）
-   * @returns {object|null}
-   */
+  /** 从 sceneMgr 上尽量找出三维播放器（字段名因 OpenView 版本而异） */
   _markerGetWebglPlayer() {
     const sceneMgr =
       (window.coreMgr && window.coreMgr.sceneMgr) ||
@@ -835,15 +587,9 @@ class LowcodeComponent extends Component {
     if (!sceneMgr && window.webglPlayer) return window.webglPlayer;
 
     const named =
-      (sceneMgr &&
-        (sceneMgr.webglPlayer ||
-          sceneMgr.player ||
-          sceneMgr.Player ||
-          sceneMgr.viewer ||
-          sceneMgr.engine ||
-          sceneMgr.app ||
-          sceneMgr.glPlayer ||
-          sceneMgr.renderPlayer)) ||
+      this._markerPickProp(sceneMgr, [
+        'webglPlayer', 'player', 'Player', 'viewer', 'engine', 'app', 'glPlayer', 'renderPlayer',
+      ]) ||
       (window.coreMgr && window.coreMgr.webglPlayer) ||
       window.webglPlayer ||
       null;
@@ -852,18 +598,10 @@ class LowcodeComponent extends Component {
     // 扫 sceneMgr 自有属性：带 camera/renderer/canvas 的对象即视为 player
     if (sceneMgr && typeof sceneMgr === 'object') {
       try {
-        const keys = Object.keys(sceneMgr);
-        if (!this._markerLoggedSceneMgrKeys) {
-          this._markerLoggedSceneMgrKeys = true;
-          console.log('[Marker] sceneMgr.keys=', keys);
-        }
-        for (let i = 0; i < keys.length; i += 1) {
-          const v = sceneMgr[keys[i]];
-          if (!v || typeof v !== 'object') continue;
-          if (v === sceneMgr) continue;
-          if (v.camera || v.renderer || v.canvas || v.domElement || v.webglRenderer) {
-            return v;
-          }
+        for (const key of Object.keys(sceneMgr)) {
+          const v = sceneMgr[key];
+          if (!v || typeof v !== 'object' || v === sceneMgr) continue;
+          if (v.camera || v.renderer || v.canvas || v.domElement || v.webglRenderer) return v;
         }
       } catch (e) {
         // ignore
@@ -877,45 +615,27 @@ class LowcodeComponent extends Component {
     return !!(v && typeof v === 'object' && typeof v.Vector3 === 'function');
   }
 
-  /**
-   * 无 window.THREE 时，从 scene.position 借用 Vector3 构造器（供 DOM 投影）
-   */
+  /** 无 window.THREE 时，从 scene.position 借用 Vector3 构造器（供 DOM 投影） */
   _markerBuildCompatTHREE(scene) {
-    if (!scene || !scene.position || typeof scene.position.constructor !== 'function') {
-      return null;
-    }
-    const Vector3 = scene.position.constructor;
+    const Vector3 = scene && scene.position && scene.position.constructor;
+    if (typeof Vector3 !== 'function') return null;
     try {
       new Vector3();
     } catch (e) {
       return null;
     }
-    return {
-      Vector3,
-      Box3: null,
-      _compat: true,
-    };
+    return { Vector3 };
   }
 
-  /**
-   * 解析 THREE：优先 window.THREE，其次缓存的兼容对象，再深度搜索播放器/sceneMgr
-   * @returns {object|null}
-   */
+  /** 解析 THREE：优先 window.THREE，其次缓存的兼容对象，再深度搜索播放器/sceneMgr */
   _markerGetTHREE() {
-    if (typeof window === 'undefined') return null;
     if (this._markerLookLikeTHREE(window.THREE)) return window.THREE;
-    if (this._markerCompatTHREE && this._markerLookLikeTHREE(this._markerCompatTHREE)) {
-      return this._markerCompatTHREE;
-    }
     if (this._markerCompatTHREE) return this._markerCompatTHREE;
 
-    const player = this._markerGetWebglPlayer();
     const sceneMgr = window.coreMgr && window.coreMgr.sceneMgr;
-    const roots = [window.coreMgr, sceneMgr, player, window];
+    const roots = [window.coreMgr, sceneMgr, this._markerGetWebglPlayer(), window].filter(Boolean);
 
-    for (let i = 0; i < roots.length; i += 1) {
-      const root = roots[i];
-      if (!root) continue;
+    for (const root of roots) {
       const direct =
         root.THREE ||
         root.three ||
@@ -923,23 +643,14 @@ class LowcodeComponent extends Component {
         (root.renderer && root.renderer.THREE);
       if (this._markerLookLikeTHREE(direct)) return direct;
     }
-
-    for (let i = 0; i < roots.length; i += 1) {
-      const found = this._markerDeepFind(
-        roots[i],
-        (v) => this._markerLookLikeTHREE(v),
-        5,
-      );
+    for (const root of roots) {
+      const found = this._markerDeepFind(root, (v) => this._markerLookLikeTHREE(v), 5);
       if (found) return found;
     }
     return null;
   }
 
-  /**
-   * 在对象树上查找相机（traverse 或深度扫描）
-   * @param {object} root
-   * @returns {object|null}
-   */
+  /** 在对象树上查找相机（traverse 或深度扫描） */
   _markerFindCameraInObject(root) {
     if (!root) return null;
     if (this._markerLookLikeCamera(root)) return root;
@@ -953,47 +664,34 @@ class LowcodeComponent extends Component {
     return this._markerDeepFind(root, (v) => this._markerLookLikeCamera(v), 5);
   }
 
-  /**
-   * 从 sceneNode/sceneList（OpenView 常有 2 个场景）里挑「内容最多」的节点与 Scene
-   */
+  /** 从 sceneNode/sceneList（OpenView 常有 2 个场景）里挑「内容最多」的节点与 Scene */
   _markerCollectSceneCandidates(sceneMgr, player) {
     const nodes = [];
-    const listA = (sceneMgr && sceneMgr.sceneNode) || [];
-    const listB = (sceneMgr && sceneMgr.sceneList) || [];
     const pushUnique = (n) => {
       if (n && nodes.indexOf(n) < 0) nodes.push(n);
     };
-    if (Array.isArray(listA)) listA.forEach(pushUnique);
-    if (Array.isArray(listB)) listB.forEach(pushUnique);
-    if (sceneMgr) pushUnique(sceneMgr);
-    if (player) pushUnique(player);
+    [(sceneMgr && sceneMgr.sceneNode) || [], (sceneMgr && sceneMgr.sceneList) || []].forEach(
+      (list) => Array.isArray(list) && list.forEach(pushUnique),
+    );
+    pushUnique(sceneMgr);
+    pushUnique(player);
 
     const scenes = [];
-    const addScene = (s, from) => {
-      if (!s || !this._markerLookLikeScene(s)) return;
-      if (scenes.some((x) => x.scene === s)) return;
-      const childCount = Array.isArray(s.children) ? s.children.length : 0;
-      scenes.push({ scene: s, from, childCount });
+    const addScene = (s) => {
+      if (!s || !this._markerLookLikeScene(s) || scenes.some((x) => x.scene === s)) return;
+      scenes.push({ scene: s, childCount: Array.isArray(s.children) ? s.children.length : 0 });
     };
+    const deepScene = (root, depth) => this._markerDeepFind(root, (v) => this._markerLookLikeScene(v), depth);
 
-    // sceneList 项本身就可能是 Scene（K$）
-    nodes.forEach((node, idx) => {
-      addScene(node, `nodeAsScene[${idx}]`);
-      addScene(
-        this._markerPickProp(node, ['scene', 'threeScene', 'rootScene', 'Scene']),
-        `node[${idx}]`,
-      );
-      addScene(
-        this._markerDeepFind(node, (v) => this._markerLookLikeScene(v), 3),
-        `nodeDeep[${idx}]`,
-      );
+    // sceneList 项本身就可能是 Scene
+    nodes.forEach((node) => {
+      addScene(node);
+      addScene(this._markerPickProp(node, ['scene', 'threeScene', 'rootScene', 'Scene']));
+      addScene(deepScene(node, 3));
     });
-    addScene(this._markerPickProp(player, ['scene', 'threeScene', 'rootScene']), 'player');
-    addScene(
-      this._markerDeepFind(player, (v) => this._markerLookLikeScene(v), 3),
-      'playerDeep',
-    );
-    addScene(this._markerPickProp(sceneMgr, ['scene', 'threeScene']), 'sceneMgr');
+    addScene(this._markerPickProp(player, ['scene', 'threeScene', 'rootScene']));
+    addScene(deepScene(player, 3));
+    addScene(this._markerPickProp(sceneMgr, ['scene', 'threeScene']));
 
     scenes.sort((a, b) => b.childCount - a.childCount);
     return { nodes, scenes };
@@ -1006,27 +704,18 @@ class LowcodeComponent extends Component {
     const player = this._markerGetWebglPlayer();
     const { nodes, scenes } = this._markerCollectSceneCandidates(sceneMgr, player);
     // 优先采用播放器当前激活 Scene；取不到时按 sceneIndex 选两个候选场景。
-    const activeScene = this._markerPickProp(
-      player,
-      ['scene', 'threeScene', 'rootScene'],
-    );
-    const activeMeta = scenes.find((item) => item.scene === activeScene);
+    const activeScene = this._markerPickProp(player, ['scene', 'threeScene', 'rootScene']);
     const best =
-      activeMeta ||
-      scenes[Math.min(this.state.sceneIndex, Math.max(scenes.length - 1, 0))] ||
-      scenes[0] ||
+      scenes.find((item) => item.scene === activeScene) ||
+      scenes[Math.min(this.state.sceneIndex, scenes.length - 1)] ||
       null;
     const scene = best ? best.scene : null;
-    const node = nodes[0] || sceneMgr || null;
+    const node = nodes[0] || sceneMgr;
 
-    let camera =
+    const camera =
       this._markerPickProp(player, ['camera', 'Camera', 'mainCamera', 'activeCamera']) ||
       this._markerPickProp(sceneMgr, [
-        'camera',
-        'mainCamera',
-        'activeCamera',
-        'Camera',
-        'currentCamera',
+        'camera', 'mainCamera', 'activeCamera', 'Camera', 'currentCamera',
       ]) ||
       this._markerPickProp(node, ['camera', 'Camera', 'mainCamera']) ||
       this._markerFindCameraInObject(player) ||
@@ -1034,56 +723,47 @@ class LowcodeComponent extends Component {
       this._markerFindCameraInObject(scene) ||
       this._markerFindCameraInObject(node);
 
+    const isRenderer = (v) => this._markerLookLikeRenderer(v);
     const renderer =
       this._markerPickProp(player, ['renderer', 'webglRenderer', 'Renderer']) ||
       this._markerPickProp(sceneMgr, ['renderer', 'webglRenderer']) ||
       this._markerPickProp(node, ['renderer', 'webglRenderer', 'Renderer']) ||
-      this._markerDeepFind(player, (v) => this._markerLookLikeRenderer(v), 5) ||
-      this._markerDeepFind(sceneMgr, (v) => this._markerLookLikeRenderer(v), 4) ||
-      this._markerDeepFind(node, (v) => this._markerLookLikeRenderer(v), 3);
+      this._markerDeepFind(player, isRenderer, 5) ||
+      this._markerDeepFind(sceneMgr, isRenderer, 4) ||
+      this._markerDeepFind(node, isRenderer, 3);
 
-    const canvases = Array.prototype.slice.call(document.querySelectorAll('canvas'));
-    let bestCanvas =
+    let domElement =
       (renderer && renderer.domElement) ||
       (player && (player.canvas || player.domElement)) ||
       null;
-    if (!bestCanvas && canvases.length) {
+    if (!domElement) {
       // 选面积最大的 canvas，通常是三维视口
-      bestCanvas = canvases.reduce((a, b) => {
-        const aa = (a.clientWidth || 0) * (a.clientHeight || 0);
-        const bb = (b.clientWidth || 0) * (b.clientHeight || 0);
-        return bb > aa ? b : a;
-      });
+      const canvases = Array.from(document.querySelectorAll('canvas'));
+      const area = (c) => (c.clientWidth || 0) * (c.clientHeight || 0);
+      domElement = canvases.length ? canvases.reduce((a, b) => (area(b) > area(a) ? b : a)) : null;
     }
 
     return {
-      coreMgr,
       sceneMgr,
       player,
       scene,
-      scenes: scenes.map((s) => s.scene),
       sceneMeta: best,
       camera,
       renderer,
-      domElement: bestCanvas,
+      domElement,
       ready: !!(sceneMgr && sceneMgr.ready),
-      readyKnown: !!(
-        sceneMgr && typeof sceneMgr.ready === 'boolean'
-      ),
+      readyKnown: !!(sceneMgr && typeof sceneMgr.ready === 'boolean'),
       isDesign: !!(coreMgr && coreMgr.isDesign),
-      projectId: coreMgr && coreMgr.projectId,
-      nodeCount: nodes.length,
       sceneCount: scenes.length,
     };
   }
 
   /** 控制台打印当前解析到的 THREE / player / context，挂载失败时排查用 */
   _markerDebugContext() {
-    const ctx = this._markerGetContext();
-    console.log('[Marker] THREE=', !!this._markerGetTHREE(), this._markerGetTHREE());
+    const THREE = this._markerGetTHREE();
+    console.log('[Marker] THREE=', !!THREE, THREE);
     console.log('[Marker] webglPlayer=', !!this._markerGetWebglPlayer());
-    console.log('[Marker] context=', ctx);
-    return ctx;
+    console.log('[Marker] context=', this._markerGetContext());
   }
 
   /** 等待场景、画布和 OpenView ready 状态稳定后再挂载标注。 */
@@ -1103,16 +783,12 @@ class LowcodeComponent extends Component {
         ctx.THREE = THREE;
 
         const canvas = ctx.domElement;
-        let canvasUsable = false;
-        if (canvas && canvas.parentElement && canvas.isConnected !== false) {
-          const rect = canvas.getBoundingClientRect();
-          canvasUsable = rect.width > 0 && rect.height > 0;
-        }
-        if (
-          canvasUsable &&
-          ctx.scene === stableScene &&
-          canvas === stableCanvas
-        ) {
+        const rect =
+          canvas && canvas.parentElement && canvas.isConnected !== false
+            ? canvas.getBoundingClientRect()
+            : null;
+        const canvasUsable = !!rect && rect.width > 0 && rect.height > 0;
+        if (canvasUsable && ctx.scene === stableScene && canvas === stableCanvas) {
           stableTicks += 1;
         } else if (canvasUsable && ctx.scene) {
           stableScene = ctx.scene;
@@ -1122,19 +798,16 @@ class LowcodeComponent extends Component {
           stableTicks = 0;
         }
 
+        const elapsed = Date.now() - start;
         // 某些 OpenView 版本没有 ready 布尔字段；有该字段时最多等待 5 秒。
-        const readyConfirmed =
-          !ctx.readyKnown || ctx.ready || Date.now() - start >= 5000;
-        const runtimeStable =
-          ctx.scene && canvasUsable && stableTicks >= 3 && readyConfirmed;
-
-        if (runtimeStable) {
+        const readyConfirmed = !ctx.readyKnown || ctx.ready || elapsed >= 5000;
+        if (ctx.scene && canvasUsable && stableTicks >= 3 && readyConfirmed) {
           // 有 Vector3 立刻就绪；否则最多等 1.5s（仍可走无投影的 layout 兜底）
           if (THREE && typeof THREE.Vector3 === 'function') {
             resolve(ctx);
             return;
           }
-          if (Date.now() - start >= 1500) {
+          if (elapsed >= 1500) {
             console.warn('[Marker] 无 Vector3，DOM 将使用均匀布局兜底', {
               camera: !!ctx.camera,
               sceneChildren: ctx.sceneMeta && ctx.sceneMeta.childCount,
@@ -1144,7 +817,7 @@ class LowcodeComponent extends Component {
           }
         }
 
-        if (Date.now() - start > timeoutMs) {
+        if (elapsed > timeoutMs) {
           console.error('[Marker] 等待超时 dump', {
             THREE: !!THREE,
             ready: ctx.ready,
@@ -1166,57 +839,15 @@ class LowcodeComponent extends Component {
     });
   }
 
-  /** 告警类型对应填充色（urgent 红 / warning 黄 / green 绿） */
-  _markerAlertColor(type) {
-    const key = this._markerResolveType(type);
-    if (
-      typeof key === 'string' &&
-      (/^#([0-9a-f]{3,8})$/i.test(key) ||
-        /^(rgb|hsl)a?\(/i.test(key))
-    ) {
-      return { fill: key, edge: key };
-    }
-    const colors = (this.markerConfig && this.markerConfig.colors) || {};
-    if (colors[key]) return { fill: colors[key], edge: colors[key] };
-    if (key === 'urgent') return { fill: '#e11d2e', edge: '#ff6b6b' };
-    if (key === 'warning') return { fill: '#d4a017', edge: '#f5d76e' };
-    return { fill: '#1f9d55', edge: '#6ee7a8' };
-  }
-
   /**
-   * 业务告警类型标准化为 green | warning | urgent。
+   * 业务告警类型标准化为 green | warning | urgent；CSS 颜色值原样保留。
    * 兼容旧值 normal 及 red/yellow 别名。
    */
   _markerResolveType(type) {
     const value = type == null ? '' : String(type).trim();
-    if (
-      /^#([0-9a-f]{3,8})$/i.test(value) ||
-      /^(rgb|hsl)a?\(/i.test(value)
-    ) {
-      return value;
-    }
-    const map = {
-      urgent: 'urgent',
-      red: 'urgent',
-      warning: 'warning',
-      yellow: 'warning',
-      green: 'green',
-      normal: 'green',
-    };
-    if (!value) return 'green';
+    if (/^(#[0-9a-f]{3,8}$|(rgb|hsl)a?\()/i.test(value)) return value;
+    const map = { urgent: 'urgent', red: 'urgent', warning: 'warning', yellow: 'warning' };
     return map[value.toLowerCase()] || 'green';
-  }
-
-  /** 剪影 mask URL（全类型共用） */
-  _markerGetMaskUrl() {
-    const cfg = this.markerConfig || {};
-    return cfg.mask || '';
-  }
-
-  /** 左侧圆帽内的白色透明图标 URL */
-  _markerGetIconUrl() {
-    const cfg = this.markerConfig || {};
-    return cfg.icon || '';
   }
 
   /**
@@ -1226,70 +857,42 @@ class LowcodeComponent extends Component {
    * @param {string} type 告警类型
    */
   _markerPaintDomSkin(el, type) {
-    const color = this._markerAlertColor(type).fill;
-    const mask = this._markerGetMaskUrl();
-    const icon = this._markerGetIconUrl();
-    let wrap = el.querySelector('[data-marker-bg-wrap]');
+    const cfg = this.markerConfig;
+    const resolved = this._markerResolveType(type);
     let bg = el.querySelector('[data-marker-bg]');
-    if (!wrap || !bg) {
-      wrap = document.createElement('div');
+    if (!bg) {
+      const wrap = document.createElement('div');
       wrap.setAttribute('data-marker-bg-wrap', '1');
       wrap.style.cssText =
         'position:absolute;inset:0;pointer-events:none;filter:drop-shadow(0 2px 4px rgba(0,0,0,.28));';
       bg = document.createElement('div');
       bg.setAttribute('data-marker-bg', '1');
-      bg.style.cssText = [
-        'position:absolute',
-        'inset:0',
-        'background-repeat:no-repeat',
-        'background-position:center',
-        'background-size:100% 100%',
-        '-webkit-mask-repeat:no-repeat',
-        'mask-repeat:no-repeat',
-        '-webkit-mask-position:center',
-        'mask-position:center',
-        '-webkit-mask-size:100% 100%',
-        'mask-size:100% 100%',
-        'mask-mode:alpha',
-      ].join(';');
+      bg.style.cssText =
+        'position:absolute;inset:0;background-repeat:no-repeat;background-position:center;background-size:100% 100%;' +
+        '-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center;' +
+        '-webkit-mask-size:100% 100%;mask-size:100% 100%;mask-mode:alpha';
       wrap.appendChild(bg);
       el.insertBefore(wrap, el.firstChild);
     }
-    bg.style.backgroundColor = color;
-    if (mask) {
-      const maskCss = `url("${mask}")`;
-      bg.style.webkitMaskImage = maskCss;
-      bg.style.maskImage = maskCss;
-      bg.style.backgroundImage = 'none';
-    } else {
-      bg.style.webkitMaskImage = 'none';
-      bg.style.maskImage = 'none';
-      bg.style.backgroundImage = 'none';
-    }
+    const maskCss = cfg.mask ? `url("${cfg.mask}")` : 'none';
+    bg.style.backgroundColor = cfg.colors[resolved] || resolved;
+    bg.style.webkitMaskImage = maskCss;
+    bg.style.maskImage = maskCss;
+    bg.style.backgroundImage = 'none';
 
     let iconEl = el.querySelector('[data-marker-icon]');
     if (!iconEl) {
-      const cfg = this.markerConfig || {};
       iconEl = document.createElement('img');
       iconEl.setAttribute('data-marker-icon', '1');
       iconEl.alt = '';
       iconEl.draggable = false;
-      iconEl.style.cssText = [
-        'position:absolute',
-        `left:${cfg.iconLeft != null ? cfg.iconLeft : 12}px`,
-        `top:${cfg.iconTop != null ? cfg.iconTop : 12}px`,
-        `width:${cfg.iconWidth != null ? cfg.iconWidth : 24}px`,
-        `height:${cfg.iconHeight != null ? cfg.iconHeight : 24}px`,
-        'display:block',
-        'object-fit:contain',
-        'pointer-events:none',
-        'user-select:none',
-        'z-index:1',
-      ].join(';');
+      iconEl.style.cssText =
+        `position:absolute;left:${cfg.iconLeft}px;top:${cfg.iconTop}px;width:${cfg.iconWidth}px;` +
+        `height:${cfg.iconHeight}px;display:block;object-fit:contain;pointer-events:none;user-select:none;z-index:1`;
       el.appendChild(iconEl);
     }
-    if (icon) {
-      iconEl.src = icon;
+    if (cfg.icon) {
+      iconEl.src = cfg.icon;
       iconEl.style.display = 'block';
     } else {
       iconEl.removeAttribute('src');
@@ -1298,159 +901,60 @@ class LowcodeComponent extends Component {
   }
 
   /**
-   * 拆分标注文案：主文字 + 箭头
-   * count 按接口原值显示：F1 + 1 → F1-1，F2 + 0 → F2-0
-   */
-  _markerLabelParts(name, count) {
-    const mainName = name == null ? '' : String(name);
-    if (count == null || count === '') {
-      return { main: mainName, arrow: '>' };
-    }
-    return { main: `${mainName}-${String(count)}`, arrow: '>' };
-  }
-
-  /**
-   * DOM 标注外壳样式（整张剪影含尖角）
-   * transform: translate(-anchorX%, -100%) ≈ 底部箭头对准投影点
-   */
-  _markerDomShellStyle() {
-    const cfg = this.markerConfig || {};
-    const w = cfg.domWidth != null ? cfg.domWidth : 156;
-    const h = cfg.domHeight != null ? cfg.domHeight : 156;
-    const ax = cfg.anchorX != null ? cfg.anchorX : 77 / 156;
-    return [
-      'position:absolute',
-      `transform:translate(${-(ax * 100).toFixed(2)}%, -100%)`,
-      `width:${w}px`,
-      `height:${h}px`,
-      'pointer-events:auto',
-      'cursor:pointer',
-      'box-sizing:border-box',
-      'user-select:none',
-    ].join(';');
-  }
-
-  /**
-   * 短文案保持 textX；长文案左移，避免「>」落到横幅淡出区外
-   * 字号固定 20px / 字重 500，不缩小
-   */
-  _markerResolveTextX(measureCtx, main, arrow, scale) {
-    const cfg = this.markerConfig || {};
-    const S = scale != null ? scale : 1;
-    const preferred = (cfg.textX != null ? cfg.textX : 52) * S;
-    const minX = (cfg.textXMin != null ? cfg.textXMin : 44) * S;
-    const maxRight = (cfg.textXMaxRight != null ? cfg.textXMaxRight : 140) * S;
-    const gap = 6 * S;
-    if (!measureCtx || typeof measureCtx.measureText !== 'function') {
-      return preferred;
-    }
-    const total =
-      measureCtx.measureText(main).width +
-      gap +
-      measureCtx.measureText(arrow).width;
-    if (preferred + total <= maxRight) return preferred;
-    return Math.max(minX, maxRight - total);
-  }
-
-  /**
    * 填充 DOM 标注文字（主文案 + >）
-   * 先按源图坐标系测宽算 left%，再以设计稿 20px/500 渲染
+   * 先按源图坐标系测宽算 left%，再以设计稿 20px/500 渲染。
+   * count 按接口原值显示：F1 + 1 → F1-1，F2 + 0 → F2-0
    * @param {HTMLElement} el 标注外壳节点
    * @param {string} name 厂房名称
    * @param {number|string|null} count 数量；有值则展示 name-count
    */
   _markerFillDomLabel(el, name, count) {
-    const parts = this._markerLabelParts(name, count);
-    const cfg = this.markerConfig || {};
-    // 设计稿固定：font-size:20px; font-weight:500;
-    const fs = cfg.domFontSize != null ? cfg.domFontSize : 20;
-    const lh = cfg.domLineHeight != null ? cfg.domLineHeight : 24;
-    const fw = cfg.domFontWeight != null ? cfg.domFontWeight : 500;
-    const ff =
-      cfg.domFontFamily ||
-      'SourceHanSansSC, "Source Han Sans SC", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif';
-    const shadow = cfg.domTextShadow || '0px 2px 4px rgba(0,0,0,0.5)';
-    const topPct = cfg.domTextTopPercent != null ? cfg.domTextTopPercent : 15.4;
-    const imgW = cfg.imageWidth || 156;
-    const imgH = cfg.imageHeight || 156;
-    const domH = cfg.domHeight != null ? cfg.domHeight : 156;
-    const domW = cfg.domWidth != null ? cfg.domWidth : 156;
+    const cfg = this.markerConfig;
+    const label = name == null ? '' : String(name);
+    const main = count == null || count === '' ? label : `${label}-${count}`;
+    const { domFontFamily: ff, domLineHeight: lh, domFontWeight: fw } = cfg;
     const prevLabel = el.querySelector('[data-marker-label]');
     if (prevLabel) prevLabel.remove();
 
     // 用离屏 canvas 按源图固定字号测宽，再映射左偏移（字号本身不变）
+    // 短文案保持 textX；长文案左移，避免「>」落到横幅淡出区外
     const measure = document.createElement('canvas').getContext('2d');
-    const srcFs =
-      cfg.fontSize != null
-        ? cfg.fontSize
-        : Math.round(fs * (imgH / domH));
-    measure.font = `${fw} ${srcFs}px ${ff}`;
-    const textX = this._markerResolveTextX(measure, parts.main, parts.arrow, 1);
-    const leftPct = (textX / imgW) * 100;
-    const maxRight = cfg.textXMaxRight != null ? cfg.textXMaxRight : 140;
-    const rightPx = Math.max(4, Math.round(domW * (1 - maxRight / imgW)));
+    measure.font = `${fw} ${cfg.fontSize}px ${ff}`;
+    const total = measure.measureText(main).width + 6 + measure.measureText('>').width;
+    const textX =
+      cfg.textX + total <= cfg.textXMaxRight
+        ? cfg.textX
+        : Math.max(cfg.textXMin, cfg.textXMaxRight - total);
+    const rightPx = Math.max(4, Math.round(cfg.domWidth * (1 - cfg.textXMaxRight / cfg.imageWidth)));
 
     // 24×line-height 盒子中心对齐圆形水平中线（设计稿垂直居中）
     // +1px：补偿 text-shadow 向下扩散带来的视觉上浮
     const row = document.createElement('div');
     row.setAttribute('data-marker-label', '1');
-    row.style.cssText = [
-      'position:absolute',
-      `left:${leftPct}%`,
-      `right:${rightPx}px`,
-      `top:${topPct}%`,
-      'transform:translateY(calc(-50% + 1px))',
-      'display:flex',
-      'flex-direction:row',
-      'align-items:center',
-      `height:${lh}px`,
-      `line-height:${lh}px`,
-      'white-space:nowrap',
-      'overflow:visible',
-      'z-index:1',
-      'text-align:left',
-      'font-style:normal',
-      'box-sizing:border-box',
-    ].join(';');
+    row.style.cssText =
+      `position:absolute;left:${(textX / cfg.imageWidth) * 100}%;right:${rightPx}px;top:${cfg.domTextTopPercent}%;` +
+      `transform:translateY(calc(-50% + 1px));display:flex;align-items:center;height:${lh}px;line-height:${lh}px;` +
+      'white-space:nowrap;z-index:1;text-align:left;font-style:normal;box-sizing:border-box';
 
-    const textStyle = [
-      `font-family:${ff}`,
-      `font-size:${fs}px`,
-      `font-weight:${fw}`,
-      `line-height:${lh}px`,
-      'height:' + lh + 'px',
-      'color:#FFFFFF',
-      `text-shadow:${shadow}`,
-      'text-align:left',
-      'font-style:normal',
-      'display:inline-block',
-      'vertical-align:middle',
-      '-webkit-font-smoothing:antialiased',
-      'moz-osx-font-smoothing:grayscale',
-    ].join(';');
-
-    const main = document.createElement('span');
-    main.textContent = parts.main;
-    main.style.cssText = textStyle;
-
-    const arrow = document.createElement('span');
-    arrow.textContent = parts.arrow;
+    const textStyle =
+      `font-family:${ff};font-size:${cfg.domFontSize}px;font-weight:${fw};line-height:${lh}px;height:${lh}px;` +
+      `color:#FFFFFF;text-shadow:${cfg.domTextShadow};-webkit-font-smoothing:antialiased`;
     // 设计稿箭头与正文同一套样式，间距约 6px
-    arrow.style.cssText = `${textStyle};margin-left:6px;width:auto;`;
-
-    row.appendChild(main);
-    row.appendChild(arrow);
+    [main, '>'].forEach((text, i) => {
+      const span = document.createElement('span');
+      span.textContent = text;
+      span.style.cssText = i ? `${textStyle};margin-left:6px` : textStyle;
+      row.appendChild(span);
+    });
     el.appendChild(row);
-    el.title = parts.main;
+    el.title = main;
   }
 
   /** 按候选字段名依次取值，命中即返回 */
   _markerPickProp(obj, paths) {
     if (!obj) return null;
-    for (let i = 0; i < paths.length; i += 1) {
-      if (obj[paths[i]] != null) return obj[paths[i]];
-    }
-    return null;
+    const key = paths.find((p) => obj[p] != null);
+    return key ? obj[key] : null;
   }
 
   /** 判断对象是否像 THREE.Scene */
@@ -1490,37 +994,31 @@ class LowcodeComponent extends Component {
    */
   _markerDeepFind(root, tester, maxDepth) {
     if (!root || typeof root !== 'object') return null;
-    const seen = typeof WeakSet !== 'undefined' ? new WeakSet() : null;
-    const queue = [{ obj: root, depth: 0 }];
+    const seen = new WeakSet();
+    const queue = [[root, 0]];
 
-    while (queue.length) {
-      const cur = queue.shift();
-      const { obj, depth } = cur;
-      if (!obj || typeof obj !== 'object') continue;
-      if (seen) {
-        if (seen.has(obj)) continue;
-        seen.add(obj);
-      }
+    for (let head = 0; head < queue.length; head += 1) {
+      const [obj, depth] = queue[head];
+      if (!obj || typeof obj !== 'object' || seen.has(obj)) continue;
+      seen.add(obj);
       if (tester(obj)) return obj;
       if (depth >= maxDepth) continue;
 
       if (Array.isArray(obj)) {
-        for (let i = 0; i < obj.length && i < 30; i += 1) {
-          queue.push({ obj: obj[i], depth: depth + 1 });
-        }
-      } else {
-        const keys = Object.keys(obj);
-        for (let k = 0; k < keys.length && k < 60; k += 1) {
-          const key = keys[k];
-          if (key === 'parent' || key.startsWith('__')) continue;
-          if (key === 'children' && depth > 1) continue;
+        obj.slice(0, 30).forEach((child) => queue.push([child, depth + 1]));
+        continue;
+      }
+      Object.keys(obj)
+        .slice(0, 60)
+        .forEach((key) => {
+          if (key === 'parent' || key.startsWith('__')) return;
+          if (key === 'children' && depth > 1) return;
           try {
-            queue.push({ obj: obj[key], depth: depth + 1 });
+            queue.push([obj[key], depth + 1]);
           } catch (e) {
             // ignore
           }
-        }
-      }
+        });
     }
     return null;
   }
@@ -1533,16 +1031,15 @@ class LowcodeComponent extends Component {
    */
   _markerMountDomOverlay(ctx) {
     const THREE = ctx.THREE || this._markerGetTHREE();
-    let camera = ctx.camera;
     const canvas = ctx.domElement;
-    if (!canvas || !this._markers.length) {
+    let camera = ctx.camera;
+    const markers = this._markers;
+    if (!canvas || !markers.length) {
       console.warn('[Marker] DOM 叠加层跳过：缺少 canvas/markers');
       return;
     }
 
-    if (this._markerDomLayer && this._markerDomLayer.parentNode) {
-      this._markerDomLayer.parentNode.removeChild(this._markerDomLayer);
-    }
+    if (this._markerDomLayer) this._markerDomLayer.remove();
 
     const parent = canvas.parentElement || document.body;
     const layer = document.createElement('div');
@@ -1550,17 +1047,20 @@ class LowcodeComponent extends Component {
     // 覆盖三维画布同级区域；自身不接收事件，交给子标注
     layer.style.cssText =
       'position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:hidden;z-index:20;';
-    if (getComputedStyle(parent).position === 'static') {
-      parent.style.position = 'relative';
-    }
+    if (getComputedStyle(parent).position === 'static') parent.style.position = 'relative';
     parent.appendChild(layer);
     this._markerDomLayer = layer;
-    this._markerCanvas = canvas;
 
-    const nodes = this._markers.map((m, idx) => {
+    // 整张剪影含尖角：translate(-anchorX%, -100%) ≈ 底部箭头对准投影点
+    const cfg = this.markerConfig;
+    const shellStyle =
+      `position:absolute;transform:translate(${-(cfg.anchorX * 100).toFixed(2)}%, -100%);` +
+      `width:${cfg.domWidth}px;height:${cfg.domHeight}px;pointer-events:auto;cursor:pointer;` +
+      'box-sizing:border-box;user-select:none';
+    markers.forEach((marker) => {
       const el = document.createElement('div');
-      const ud = m.sprite.userData;
-      el.style.cssText = this._markerDomShellStyle();
+      const ud = marker.userData;
+      el.style.cssText = shellStyle;
       this._markerPaintDomSkin(el, ud.type);
       this._markerFillDomLabel(el, ud.name, ud.count);
       el.addEventListener('click', (e) => {
@@ -1570,9 +1070,7 @@ class LowcodeComponent extends Component {
         if (ud.name === 'X12') this.goX12();
       });
       layer.appendChild(el);
-      // 回挂 DOM 节点，供 updateCount / updateType 刷新
-      m.sprite._domEl = el;
-      return { el, marker: m, idx };
+      marker.el = el;
     });
 
     const canProject = !!(
@@ -1581,18 +1079,15 @@ class LowcodeComponent extends Component {
       typeof THREE.Vector3 === 'function' &&
       typeof new THREE.Vector3().project === 'function'
     );
-
-    let tmp = null;
-    if (canProject) tmp = new THREE.Vector3();
+    const tmp = canProject ? new THREE.Vector3() : null;
 
     /** 无相机/投影失败时：在画布中部横向均匀排布 */
-    const layoutFallback = (node, rect, offsetX, offsetY) => {
-      const n = nodes.length || 1;
-      const x = offsetX + rect.width * (0.25 + (0.5 * node.idx) / Math.max(n - 1, 1));
-      const y = offsetY + rect.height * 0.42;
-      node.el.style.left = `${x}px`;
-      node.el.style.top = `${y}px`;
-      node.el.style.visibility = 'visible';
+    const layoutFallback = (marker, idx, rect, offsetX, offsetY) => {
+      const n = markers.length || 1;
+      const x = offsetX + rect.width * (0.25 + (0.5 * idx) / Math.max(n - 1, 1));
+      marker.el.style.left = `${x}px`;
+      marker.el.style.top = `${offsetY + rect.height * 0.42}px`;
+      marker.el.style.visibility = 'visible';
     };
 
     let healthFrame = 0;
@@ -1610,10 +1105,9 @@ class LowcodeComponent extends Component {
       // 首次加载时 OpenView 可能替换 canvas 或其容器；旧叠加层会因此不可见。
       if (
         !layer.parentElement ||
+        layer.parentElement !== canvas.parentElement ||
         layer.isConnected === false ||
-        !canvas.parentElement ||
-        canvas.isConnected === false ||
-        layer.parentElement !== canvas.parentElement
+        canvas.isConnected === false
       ) {
         requestRemount('canvas-or-layer-detached');
         return;
@@ -1646,37 +1140,28 @@ class LowcodeComponent extends Component {
       const parentRect = layer.parentElement.getBoundingClientRect();
       const offsetX = rect.left - parentRect.left;
       const offsetY = rect.top - parentRect.top;
-      const projectNow = !!(
-        camera &&
-        tmp &&
-        typeof tmp.project === 'function'
-      );
 
-      nodes.forEach((node) => {
-        if (!projectNow) {
-          layoutFallback(node, rect, offsetX, offsetY);
+      markers.forEach((marker, idx) => {
+        if (!camera || !tmp) {
+          layoutFallback(marker, idx, rect, offsetX, offsetY);
           return;
         }
-        const pos = node.marker.sprite.position;
+        const pos = marker.position;
         tmp.set(pos.x, pos.y, pos.z);
         try {
           tmp.project(camera);
         } catch (e) {
-          layoutFallback(node, rect, offsetX, offsetY);
+          layoutFallback(marker, idx, rect, offsetX, offsetY);
           return;
         }
         // NDC → 屏幕像素；z 超出 [-1,1] 视为在视锥外，隐藏
-        const visible = tmp.z >= -1 && tmp.z <= 1;
-        const x = ((tmp.x + 1) / 2) * rect.width + offsetX;
-        const y = ((-tmp.y + 1) / 2) * rect.height + offsetY;
-        node.el.style.left = `${x}px`;
-        node.el.style.top = `${y}px`;
-        node.el.style.visibility = visible ? 'visible' : 'hidden';
+        const style = marker.el.style;
+        style.left = `${((tmp.x + 1) / 2) * rect.width + offsetX}px`;
+        style.top = `${((-tmp.y + 1) / 2) * rect.height + offsetY}px`;
+        style.visibility = tmp.z >= -1 && tmp.z <= 1 ? 'visible' : 'hidden';
       });
     };
     tick();
-    console.log('[Marker] DOM 叠加层已启用', nodes.length, canProject ? 'project' : 'layout');
+    console.log('[Marker] DOM 叠加层已启用', markers.length, canProject ? 'project' : 'layout');
   }
-
-  // ===========================================================================
 }
