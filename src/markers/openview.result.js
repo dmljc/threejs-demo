@@ -16,8 +16,9 @@ class LowcodeComponent extends Component {
      * 当前场景索引
      * 0 = 首页 / 大屏概览
      * 1 = X12 厂房
+     * 刷新必须在首帧就是 1。若从 0 起画，播放器会先绑概览模型，之后 setState 只改 UI 和标注。
      */
-    sceneIndex: 0,
+    sceneIndex: this._getWsTargetBuildingId() === 12 ? 1 : 0,
     // 警告统计
     alarmStats: {},
     // 处置统计
